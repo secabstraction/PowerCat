@@ -1,10 +1,10 @@
-powercat
+PowerCat
 ========
-Netcat: The powershell version. (Powershell Version 2 and Later Supported)
+A PowerShell version of netcat. (Powershell Version 2 and Later Supported)
 
 Installation
 ------------
-powercat is a powershell function.  First you need to load the function before you can execute it.  You can put one of the below commands into your powershell profile so powercat is automatically loaded when powershell starts.
+PowerCat is a PowerShell module.  First you need to load the function before you can execute it.  You can put one of the below commands into your powershell profile so powercat is automatically loaded when powershell starts.
 ###
     Load The Function From Downloaded .ps1 File:
         . .\powercat.ps1
