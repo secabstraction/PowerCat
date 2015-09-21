@@ -1,7 +1,8 @@
 function Invoke-PowerCat {
 <#
-powercat - Netcat, The Powershell Version
-Github Repository: https://github.com/besimorhino/powercat
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+Adapted from https://github.com/besimorhino/powercat
 
 This script attempts to implement the features of netcat in a powershell
 script. It also contains extra features such as built-in relays, execute
