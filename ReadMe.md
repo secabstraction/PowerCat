@@ -1,6 +1,6 @@
 PowerCat
 ========
-A PowerShell version of netcat. (Powershell Version 2 and Later Supported)
+A PowerShell TCP/IP swiss army knife. #requires -Version 2
 
 Installation
 ------------
