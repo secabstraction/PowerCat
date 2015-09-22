@@ -124,6 +124,9 @@ PowerCat can also be used to perform port-scans, and start persistent listeners.
 ###
     Basic TCP port scan:
         1..1024 | ForEach-Object { Invoke-PowerCat -Client 10.1.1.10 -Port $_ -Timeout 1 -Verbose -Disconnect }
+    
+    Basic UDP port scan:
+        1..1024 | ForEach-Object { Invoke-PowerCat -Mode Udp -Client 10.1.1.10 -Port $_ -Timeout 1 -Verbose }
         
     Persistent listener:
         Invoke-PowerCat -Listener -Port 443 -Input C:\pathto\inputfile -Repeat
