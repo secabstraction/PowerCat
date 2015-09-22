@@ -247,7 +247,7 @@ Examples:
                 }
             }
         }        
-        elseif($Relay.Split(":").Count -eq 3) {
+        elseif ($Relay.Split(":").Count -eq 3) {
 
             $Port = [Int]$Relay.Split(":")[2]
             foreach ($Connection in $ActiveTcpConnections) {
@@ -286,14 +286,14 @@ Examples:
         if ($Listener.IsPresent) {
 
             $SocketDestinationBuffer = New-Object Byte[] 65536
-            $EndPoint = New-Object Net.IPEndPoint ([Net.IPAddress]::Any), $Port
+            $IPEndPoint = New-Object Net.IPEndPoint ([Net.IPAddress]::Any),$Port
             $FuncVars.Socket = New-Object Net.Sockets.UDPClient $Port
             $PacketInfo = New-Object Net.Sockets.IPPacketInformation
 
             Write-Verbose ("Listening on [0.0.0.0] port " + $Port + " [udp]")
 
             $SocketFlagsNone = [Net.Sockets.SocketFlags]::None
-            $ConnectHandle = $FuncVars.Socket.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, $SocketFlagsNone, [ref]$EndPoint, $null, $null)
+            $ConnectHandle = $FuncVars.Socket.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, $SocketFlagsNone, [ref]$IPEndPoint, $null, $null)
             $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
       
             while ($true) {
@@ -315,7 +315,7 @@ Examples:
 
                 if ($ConnectHandle.IsCompleted) {
                     $SocketBytesRead = $FuncVars.Socket.Client.EndReceiveMessageFrom($ConnectHandle, [ref]$SocketFlagsNone, [ref]$EndPoint, [ref]$PacketInfo)
-                    Write-Verbose ("Connection from [" + $EndPoint.Address.IPAddressToString + "] port " + $Port + " [udp] accepted (source port " + $EndPoint.Port + ")")
+                    Write-Verbose ("Connection from [" + $IPEndPoint.Address.IPAddressToString + "] port " + $Port + " [udp] accepted (source port " + $IPEndPoint.Port + ")")
                     break
                 }
             }
