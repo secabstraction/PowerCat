@@ -124,13 +124,13 @@ Examples:
         
         [Parameter(ParameterSetName = 'Client')]
         [Parameter(ParameterSetName = 'Listener')]
-        [Parameter(ParameterSetName = 'ExecutePowerShell')]
+        [Parameter(ParameterSetName = 'PowerShell')]
         [Alias("ep")]
-        [Switch]$ExecutePowerShell,
+        [Switch]$PowerShell,
     
         [Parameter(ParameterSetName = 'Client', ValueFromPipeline = $true)]
         [Parameter(ParameterSetName = 'Listener', ValueFromPipeline = $true)]
-        [Parameter(ParameterSetName = 'ExecutePowerShell', ValueFromPipeline = $true)]
+        [Parameter(ParameterSetName = 'PowerShell', ValueFromPipeline = $true)]
         [Alias("i")]
         [Object]$Input,
 
