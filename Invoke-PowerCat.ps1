@@ -135,8 +135,9 @@ Examples:
         [Object]$Input,
 
         [Parameter()]
-        [Alias("u")]
-        [Switch]$Udp,
+        [Alias("m")]
+        [ValidateSet('Udp','Tcp','Icmp')]
+        [String]$Mode = 'Tcp',
     
         [Parameter()]
         [Alias("dnscat2")]
@@ -144,15 +145,15 @@ Examples:
     
         [Parameter()]
         [Alias("dnsft")]
-        [Int]$DNSFailureThreshold = 10,
+        [Int]$Threshold = 10,
     
         [Parameter()]
         [Alias("t")]
         [Int]$Timeout = 60,
     
         [Parameter()]
-        [ValidateSet('Host','Bytes','String')]
         [Alias("o")]
+        [ValidateSet('Host','Bytes','String')]
         [String]$OutputType = "Host",
 
         [Parameter()]
