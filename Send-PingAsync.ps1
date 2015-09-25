@@ -1,15 +1,19 @@
 function Send-PingAsync {
 [CmdLetBinding()]
      Param(
-        [Parameter(Position = 0, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]
-        [String[]]$ComputerName
+        [String[]]$ComputerName,
+        
+        [Parameter(Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [String[]]$Timeout = 250
     ) #End Param
 
     $Pings = New-Object Collections.Arraylist
 
     foreach ($Computer in $ComputerName) {
-        [void]$Pings.Add((New-Object Net.NetworkInformation.Ping).SendPingAsync($Computer, 250))
+        [void]$Pings.Add((New-Object Net.NetworkInformation.Ping).SendPingAsync($Computer, $Timeout))
     }
     Write-Verbose "Waiting for ping tasks to complete..."
     [Threading.Tasks.Task]::WaitAll($Pings)
