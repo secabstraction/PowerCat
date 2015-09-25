@@ -15,5 +15,4 @@ function Send-PingAsync {
     [Threading.Tasks.Task]::WaitAll($Pings)
 
     foreach ($Ping in $Pings) { Write-Output $Ping.Result }
-    }
 }
