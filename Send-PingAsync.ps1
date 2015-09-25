@@ -14,9 +14,6 @@ function Send-PingAsync {
     }
     [Threading.Tasks.Task]::WaitAll($Pings)
 
-    foreach ($Ping in $Pings) {
-        if ($Ping.Result.Status -eq [Net.NetworkInformation.IPStatus]::Success) {
-            Write-Output $Ping.Result
-        }
+    foreach ($Ping in $Pings) { Write-Output $Ping.Result }
     }
 }
