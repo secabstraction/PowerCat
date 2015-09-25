@@ -7,7 +7,7 @@ function Send-PingAsync {
         
         [Parameter(Position = 1)]
         [ValidateNotNullOrEmpty()]
-        [String[]]$Timeout = 250
+        [Int32]$Timeout = 250
     ) #End Param
 
     $Pings = New-Object Collections.Arraylist
