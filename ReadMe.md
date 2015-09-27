@@ -1,43 +1,43 @@
 PowerCat
 ========
+```powershell
+Write-Warning 'PowerCat is under construction. Check back soon for updates.'
+Write-Warning 'I will remove this warning when the code is functional.'
+```
 A PowerShell TCP/IP swiss army knife. #requires -Version 2
 
 Installation
 ------------
 PowerCat is a PowerShell module.  First you need to import the module before you can use the PowerCat functions.  You can put one of the below commands into your PowerShell profile so PowerCat is automatically loaded when PowerShell starts.
 ###
-    Import the functions from downloaded .psm1 File:
+```powershell
+    # Import the functions from downloaded .psm1 File:
         Import-Module PowerCat.psm1
-    Load the functions individually from URL:
+    # Load the functions individually from URL:
         Invoke-Expression (New-Object Net.Webclient).DownloadString('https://raw.githubusercontent.com/secabstraction/PowerCat/master/Invoke-PowerCat.ps1')
         Invoke-Expression (New-Object Net.Webclient).DownloadString('https://raw.githubusercontent.com/secabstraction/PowerCat/master/Invoke-DnsCat.ps1')
-
+```
 ### Parameters:
-    
+```powershell    
     New-PowerCat
     
-    -Listener       Listen for a connection.                            [Switch]
-    -Client         IPv4 address of a listener to connect to.           [String]
-    -Relay          Format: "<Mode>:10.1.1.1:443"                       [String]
+    -Listener       # Listen for a connection.                            [Switch]
+    -Client         # IPv4 address of a listener to connect to.           [String]
+    -Relay          # Format: "<Mode>:10.1.1.1:443"                       [String]
     
-    -Mode           Defaults to Tcp, can also specify Udp, Icmp         [String]
-    -Port           The port to connect to or listen on.                [Int]
-    -Execute        Execute a process.                                  [String]
-    -PowerShell     Execute Powershell.                                 [Switch]
-    -Timeout        Timeout option. Default: 60                         [Int]
-    -Input          Filepath (string), byte array, or string.           [Object]
-    -OutputType     Console Output Type: "Host", "Bytes", or "String"   [String]
-    -OutputFile     Output File Path.                                   [String]
-    -Disconnect     Disconnect after connecting.                        [Switch]
-    -Repeat         Restart after disconnecting.                        [Switch]
-    -Payload        Generate payload.                                   [Switch]
-    -Encoded        Base64 encode payload.                              [Switch]
-    
-    Invoke-DnsCat
-    
-    -Server         Name of DnsCat2 server to connect to.               [String]
-    -Threshold      DNS Failure Threshold.                              [Int]
-
+    -Mode           # Defaults to Tcp, can also specify Udp, Icmp         [String]
+    -Port           # The port to connect to or listen on.                [Int]
+    -Execute        # Execute a process.                                  [String]
+    -PowerShell     # Execute Powershell.                                 [Switch]
+    -Timeout        # Timeout option. Default: 60                         [Int]
+    -Input          # Filepath (string), byte array, or string.           [Object]
+    -OutputType     # Console Output Type: "Host", "Bytes", or "String"   [String]
+    -OutputFile     # Output File Path.                                   [String]
+    -Disconnect     # Disconnect after connecting.                        [Switch]
+    -Repeat         # Restart after disconnecting.                        [Switch]
+    -Payload        # Generate payload.                                   [Switch]
+    -Encoded        # Base64 encode payload.                              [Switch]
+```
 Basic Connections
 -----------------------------------
 By default, PowerCat reads input from the console and writes input to the console using write-host. You can change the output type to 'Bytes', or 'String' with the -OutputType.
