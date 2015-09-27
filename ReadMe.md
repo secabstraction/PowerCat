@@ -90,7 +90,7 @@ PowerCat supports more than sending data over TCP.
 ```
 Relays
 ------
-Relays in PowerCat work are similar to netcat relays, but you don't have to create a file or start a second process. You can also relay data between connections of different protocols.
+Relays in PowerCat are similar to netcat relays, but you don't have to create a file or start a second process. You can also relay data between connections of different protocols.
 ###
 ```powershell
     # TCP Listener to TCP Client Relay:
