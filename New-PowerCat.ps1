@@ -1,4 +1,4 @@
-function Invoke-PowerCat {
+function New-PowerCat {
 <#
 Author: Jesse Davis (@secabstraction)
 License: BSD 3-Clause
