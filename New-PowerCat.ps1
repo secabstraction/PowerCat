@@ -106,10 +106,11 @@ Examples:
         [Parameter(ParameterSetName = 'Listener', Position = 0, Mandatory = $true)]
         [Alias("l")]
         [Switch]$Listener,
-    
-        [Parameter(ParameterSetName = 'Relay', Position = 0, Mandatory = $true)]
-        [Alias("r")]
-        [String]$Relay = "",
+
+        [Parameter()]
+        [Alias("m")]
+        [ValidateSet('Udp','Tcp','Icmp', 'Smb')]
+        [String]$Mode = 'Tcp',
 
         [Parameter(ParameterSetName = 'Client', Mandatory = $true)]
         [Parameter(ParameterSetName = 'Listener', Mandatory = $true)]
@@ -133,11 +134,10 @@ Examples:
         [Parameter(ParameterSetName = 'PowerShell', ValueFromPipeline = $true)]
         [Alias("i")]
         [Object]$Input,
-
+    
         [Parameter()]
-        [Alias("m")]
-        [ValidateSet('Udp','Tcp','Icmp')]
-        [String]$Mode = 'Tcp',
+        [Alias("r")]
+        [String]$RelayTo = "",
     
         [Parameter()]
         [Alias("dnscat2")]
@@ -179,7 +179,9 @@ Examples:
     
     #region VALIDATE ARGS
     $IPv4 = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+    
     if (!$PSBoundParameters.OutputFile) { $OutputType = 'Bytes' }
+    
     if ($PSBoundParameters.Client) {
         if ($Client -notmatch $IPv4) {
             $AddressList = [Net.Dns]::GetHostByName($Client).AddressList
@@ -190,12 +192,13 @@ Examples:
                 }
                 break
             }
+            else { $ServerIPAddress = $AddressList[0] }
         }
-        else { $ClientIPAddress = [Net.IPAddress]::Parse($Client) }
+        else { $ServerIPAddress = [Net.IPAddress]::Parse($Client) }
     }
     if ($Listener.IsPresent) {
         
-        $IPGlobalProperties = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
+        $IPGlobalProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
         $ActiveTcpConnections = $IPGlobalProperties.GetActiveTcpConnections()
         $ActiveTcpListeners = $IPGlobalProperties.GetActiveTcpListeners()
         $ActiveUdpListeners = $IPGlobalProperties.GetActiveUdpListeners()
@@ -273,69 +276,70 @@ Examples:
     }
     #endregion VALIDATE ARGS
   
-    ############### UDP FUNCTIONS ###############
-    function Initialize-Udp {
-        param($FuncSetupVars)
+    if ($Mode -eq 'Udp') {
 
-        if ($global:Verbose) {$Verbose = $True}
+        function Initialize-Udp {
+            param($Client, $Listener, $Port, $Timeout)
+        
+            $ReturnObjects = New-Object Hashtable
+            $ReturnObjects.Encoding = New-Object Text.AsciiEncoding
 
-        $Client, $Listener, $Port, $Timeout = $FuncSetupVars
+            if ($Listener.IsPresent) {
 
-        $FuncVars = New-Object Hashtable
-        $FuncVars.Encoding = New-Object Text.AsciiEncoding
+                $SocketDestinationBuffer = New-Object -TypeName Byte[] -ArgumentList 65536
+                $ClientIPEndPoint = New-Object -TypeName Net.IPEndPoint -ArgumentList @([Net.IPAddress]::Any, $null)
+                $ReturnObjects.Socket = New-Object -TypeName Net.Sockets.UDPClient -ArgumentList $Port
+                $PacketInfo = New-Object -TypeName Net.Sockets.IPPacketInformation
 
-        if ($Listener.IsPresent) {
-
-            $SocketDestinationBuffer = New-Object Byte[] 65536
-            $IPEndPoint = New-Object Net.IPEndPoint ([Net.IPAddress]::Any),$Port
-            $FuncVars.Socket = New-Object Net.Sockets.UDPClient $Port
-            $PacketInfo = New-Object Net.Sockets.IPPacketInformation
-
-            Write-Verbose ("Listening on [0.0.0.0] port " + $Port + " [udp]")
-
-            $SocketFlagsNone = [Net.Sockets.SocketFlags]::None
-            $ConnectHandle = $FuncVars.Socket.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, $SocketFlagsNone, [ref]$IPEndPoint, $null, $null)
-            $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+                Write-Verbose "Listening on [0.0.0.0] port $Port [udp]"
+                
+                $ConnectHandle = $ReturnObjects.Socket.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$ClientIPEndPoint, $null, $null)
+                $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
       
-            while ($true) {
-                if ($Host.UI.RawUI.KeyAvailable) {          
-                    if(@(17,27) -contains ($Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown").VirtualKeyCode)) {
-                        Write-Verbose "CTRL or ESC caught. Stopping UDP Setup."
-                        $FuncVars.Socket.Close()
+                while ($true) {
+
+                    if ([console]::KeyAvailable) {          
+                        $Key = [console]::ReadKey($true)
+                        if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
+                            Write-Verbose "Ctrl+C caught. Stopping UDP Setup."
+                            $ReturnObjects.Socket.Close()
+                            $Stopwatch.Stop()
+                            [console]::TreatControlCAsInput = $false
+                            break
+                        }
+                    }
+
+                    if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
+                        Write-Warning "Timeout exceeded. Stopping UDP Setup."
+                        $ReturnObjects.Socket.Close()
                         $Stopwatch.Stop()
                         break
                     }
+
+                    if ($ConnectHandle.IsCompleted) {
+                        $SocketFlags = 0
+                        $SocketBytesRead = $ReturnObjects.Socket.Client.EndReceiveMessageFrom($ConnectHandle, [ref]$SocketFlags, [ref]$ClientIPEndPoint, [ref]$PacketInfo)
+                        Write-Verbose "Connection from [" + $ClientIPEndPoint.Address.IPAddressToString + "] port " + $ClientIPEndPoint.Port + " [udp] accepted."
+                        break
+                    }
                 }
+                $Stopwatch.Stop()
+                $ReturnObjects.InitialConnectionBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)]
+            }        
+            else { 
+                $ReturnObjects.ServerIPEndPoint = New-Object -TypeName Net.IPEndPoint -ArgumentList @($ServerIPAddress, $Port) 
+                $ReturnObjects.Socket = New-Object -TypeName Net.Sockets.UDPClient
+                $ReturnObjects.Socket.Connect($ReturnObjects.ServerIPEndPoint)
 
-                if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
-                    Write-Warning "Timeout exceeded. Stopping UDP Setup."
-                    $FuncVars.Socket.Close()
-                    $Stopwatch.Stop()
-                    break
-                }
-
-                if ($ConnectHandle.IsCompleted) {
-                    $SocketBytesRead = $FuncVars.Socket.Client.EndReceiveMessageFrom($ConnectHandle, [ref]$SocketFlagsNone, [ref]$EndPoint, [ref]$PacketInfo)
-                    Write-Verbose ("Connection from [" + $IPEndPoint.Address.IPAddressToString + "] port " + $Port + " [udp] accepted (source port " + $IPEndPoint.Port + ")")
-                    break
-                }
-            }
-            $Stopwatch.Stop()
-            $FuncVars.InitialConnectionBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)]
-        }
-
-        else { $IPEndPoint = New-Object Net.IPEndPoint $ClientIPAddress,$Port }
-
-        $FuncVars.Socket = New-Object Net.Sockets.UDPClient
-        $FuncVars.Socket.Connect($Client, $Port)
-        Write-Verbose ("Sending UDP traffic to " + $Client + " port " + $Port + "...")
-        Write-Verbose ("UDP: Make sure to send some data so the server can notice you!")
+                Write-Verbose ("Sending UDP traffic to " + $Client + " port " + $Port + "...")
+                Write-Verbose ("UDP: Make sure to send some data so the server can notice you!")
     
-        $FuncVars.BufferSize = 65536
-        $FuncVars.IPEndPoint = $IPEndPoint
-        $FuncVars.StreamDestinationBuffer = New-Object Byte[] $FuncVars.BufferSize
-        $FuncVars.StreamReadOperation = $FuncVars.Socket.Client.BeginReceiveFrom($FuncVars.StreamDestinationBuffer, 0, $FuncVars.BufferSize, $SocketFlagsNone, [ref]$FuncVars.IPEndPoint, $null, $null)
-        return $FuncVars
+                $ReturnObjects.BufferSize = 65536
+                $ReturnObjects.StreamDestinationBuffer = New-Object -TypeName Byte[] -ArgumentList $BufferSize
+                $ReturnObjects.StreamReadOperation = $Socket.Client.BeginReceiveFrom($StreamDestinationBuffer, 0, $BufferSize, [Net.Sockets.SocketFlags]::None, [ref]$ReturnObjects.ServerIPEndPoint, $null, $null)
+            }
+            return $ReturnObjects
+        }
     }
 
   function ReadData_UDP
