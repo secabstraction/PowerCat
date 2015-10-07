@@ -85,8 +85,8 @@ PowerCat supports more than sending data over TCP.
     # Send Data Over UDP:
     New-PowerCat -Listener -Port 8000 -Mode Udp
         
-    # Send Data Over ICMP:
-    New-PowerCat -Listener -Mode Smb        
+    # Send Data Over SMB:
+    New-PowerCat -Listener -Mode Smb -PipeName PowerCat
     
     # Send Data Over ICMP:
     New-PowerCat -Listener -Mode Icmp
