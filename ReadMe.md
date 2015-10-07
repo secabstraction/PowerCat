@@ -77,7 +77,7 @@ PowerCat can be used to send and serve shells. Specify an executable to -Execute
     # Serve a shell which executes powershell commands:
     New-PowerCat -Listener -Port 443 -PowerShell
 ```
-UDP and ICMP
+UDP, SMB, and ICMP
 -----------
 PowerCat supports more than sending data over TCP. 
 ###
@@ -86,7 +86,10 @@ PowerCat supports more than sending data over TCP.
     New-PowerCat -Listener -Port 8000 -Mode Udp
         
     # Send Data Over ICMP:
-    New-PowerCat -Listener -Port 8000 -Mode Icmp
+    New-PowerCat -Listener -Port 8000 -Mode Smb        
+    
+    # Send Data Over ICMP:
+    New-PowerCat -Listener -Mode Icmp
 ```
 Relays
 ------
