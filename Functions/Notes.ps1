@@ -1,19 +1,30 @@
 ﻿# Initialize-NetworkStream                    >> Waits for network connection
+
+
 # Initialize-IOStream -Console                >> 
-# Read-NetworkStream 
-# Write-IOStream
+# If ($NetStream.Available)
+# Read-NetworkStream > Write-Console
+#
+# If ($Console.Availalbe)
+# Read-Console > Write-NetworkStream
 New-PowerCat -Listener -Port 444 
 New-PowerCat -Client 8.8.8.8 -Port 444
 
-# 
-New-PowerCat -Listener -Port 444 -OutputFile
+# If ($NetStream.Available)
+# Read-NetworkStream
+# WriteAllBytes
+New-PowerCat -Listener -Port 444 -OutputFile C:\Pathto\output.file
 
-# Read-IOStream/Input
+# Initialize-IOStream
+# Read-IOStream
 # Write-NetworkStream
 New-PowerCat -Execute ConsoleApp
 New-PowerCat -PowerShell -ScriptBlock
+
+
 New-PowerCat -Input byte[]
-New-PowerCat -InputFile C:\file
+
+New-PowerCat -SendFile C:\file
 
 # Read-NetworkStream
 # Write-NetworkStream

@@ -20,6 +20,7 @@ function Send-PingAsync {
 
     foreach ($Ping in $Pings) { Write-Output $Ping.Result }
 }
+
 function New-TargetList {
 <#
 .SYNOPSIS
