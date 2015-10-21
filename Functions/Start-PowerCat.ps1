@@ -4,7 +4,7 @@
         [Parameter(Position = 0, Mandatory = $true)]
         [Alias("m")]
         [ValidateSet('Icmp', 'Smb', 'Tcp', 'Udp')]
-        [String]$Mode = 'Tcp',
+        [String]$Mode,
         
         [Parameter(ParameterSetName = 'Execute')]
         [Alias("e")]
@@ -41,16 +41,21 @@
     
         [Parameter()]
         [Alias("rep")]
-        [Switch]$Repeater
-    )
+        [Switch]$Repeater,
+        
+        [Parameter()]
+        [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
+        [String]$Encoding = 'Ascii'
+    )    
+    
     DynamicParam {
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
         switch ($Mode) {
-            'Icmp' { $BindParam = New-RuntimeParameter -Name BindAddress -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary -ValidatePattern "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$" }
-             'Smb' { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
-             'Tcp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
-             'Udp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+            'Icmp' { $BindParam = New-RuntimeParameter -Name BindAddress -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary -ValidatePattern "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"; continue }
+             'Smb' { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary; continue }
+             'Tcp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary; continue }
+             'Udp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary; continue }
         }
 
         if ($PSBoundParameters.ScriptBlock) { $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary }
@@ -58,17 +63,19 @@
 
         return $ParameterDictionary
     }
-    Begin {    
-        $Encoding = New-Object System.Text.AsciiEncoding
-      
-        if ($PSBoundParameters.InputFile) {
-            if (Test-Path $InputFile) { [byte[]]$InputToWrite = [IO.File]::ReadAllBytes($InputFile) }
-            else { Write-Warning "$InputFile does not exist." ; return }
+    Begin {         
+        switch ($Encoding) {
+              'Ascii' { $EncodingType = New-Object Text.AsciiEncoding; continue }
+            'Unicode' { $EncodingType = New-Object Text.UnicodeEncoding; continue }
+               'UTF7' { $EncodingType = New-Object Text.UTF7Encoding; continue }
+               'UTF8' { $EncodingType = New-Object Text.UTF8Encoding; continue }
+              'UTF32' { $EncodingType = New-Object Text.UTF32Encoding; continue }
         }
-        
-        elseif ($PSBoundParameters.Input) {        
-            if ($Input.GetType().Name -eq 'Byte[]') { [byte[]]$InputToWrite = $Input }
-            elseif ($Input.GetType().Name -eq 'String') { [byte[]]$InputToWrite = $Encoding.GetBytes($Input) }
+      
+        if ($PSBoundParameters.Input) {   
+            if ((Test-Path $Input)) { $InputToWrite = [IO.File]::ReadAllBytes($Input) }     
+            elseif ($Input.GetType().Name -eq 'Byte[]') { $InputToWrite = $Input }
+            elseif ($Input.GetType().Name -eq 'String') { $InputToWrite = $EncodingType.GetBytes($Input) }
             else { Write-Warning 'Incompatible input type.' ; return }
         }
     }

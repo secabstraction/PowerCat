@@ -1,23 +1,26 @@
 ﻿# Initialize-NetworkStream                    >> Waits for network connection
 
 
-# Initialize-IOStream -Console                >> 
+# Initialize-IOStream -Console                >> BeginRead
 # If ($NetStream.Available)
-# Read-NetworkStream > Write-Console
+#     Read-NetworkStream
+#     Write-IOStream                          >> BeginRead
 #
-# If ($Console.Availalbe)
-# Read-Console > Write-NetworkStream
-New-PowerCat -Listener -Port 444 
-New-PowerCat -Client 8.8.8.8 -Port 444
+# If ($IOStream.Read.IsCompleted)
+#     Read-IOStream
+#     Write-NetworkStream
+Start-PowerCat -Mode Tcp -Port 444 
+Connect-PowerCat -Mode Tcp -RemoteIp 8.8.8.8 -Port 444
 
 # If ($NetStream.Available)
 # Read-NetworkStream
 # WriteAllBytes
-New-PowerCat -Listener -Port 444 -OutputFile C:\Pathto\output.file
+Start-PowerCat -Mode Tcp -Port 444 -OutputFile C:\Pathto\output.file
 
 # Initialize-IOStream
-# Read-IOStream
-# Write-NetworkStream
+# If ($IOStream.Read.IsCompleted)
+#     Read-IOStream
+#     Write-NetworkStream
 New-PowerCat -Execute ConsoleApp
 New-PowerCat -PowerShell -ScriptBlock
 

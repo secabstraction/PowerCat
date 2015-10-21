@@ -1,24 +1,24 @@
-﻿function Initialize-Cmd {
+﻿function Open-ProcessStreams {
 [CmdletBinding()]
     Param (
         [Parameter(Mandatory = $true)]
         [String]$FileName,
         
         [Parameter()]
-        [String]$Arguments = ''
+        [String]$Arguments
     )
-    if ($PSBoundParameters.Arguments) {
-        $ProcessStartInfo = New-Object Diagnostics.ProcessStartInfo -ArgumentList @($FileName, $Arguments)
-    }
+
+    if ($PSBoundParameters.Arguments) { $ProcessStartInfo = New-Object Diagnostics.ProcessStartInfo -ArgumentList @($FileName, $Arguments) }
     else { $ProcessStartInfo = New-Object Diagnostics.ProcessStartInfo -ArgumentList @($FileName) }
+    
     $ProcessStartInfo.CreateNoWindow = $true
-    $ProcessStartInfo.LoadUserProfile = $False
-    $ProcessStartInfo.UseShellExecute = $False
+    $ProcessStartInfo.LoadUserProfile = $false
+    $ProcessStartInfo.UseShellExecute = $false
     $ProcessStartInfo.RedirectStandardInput = $true
     $ProcessStartInfo.RedirectStandardOutput = $true
     $ProcessStartInfo.RedirectStandardError = $true
 
-    Write-Verbose "Starting process as $FileName $Arguments"
+    Write-Verbose "Starting process: $FileName $Arguments"
 
     try { [Diagnostics.Process]::Start($ProcessStartInfo) }
     catch {
@@ -27,35 +27,40 @@
     }
 }
 
-function Read-CmdStream {
-    Param ($FuncVars)
+function Read-StdOut {
+    Param ([Diagnostics.Process]$Process)
     
-    [byte[]]$Data = @()
+    #$EncodingType = [System.Text.Encoding]::ASCII
+
+    $Chars = New-Object char[] 65536
+    $CharsRead = $Process.StandardOutput.Read($Chars, 0, $Chars.Length)
+
+    if ($CharsRead) { $OutBytes = $EncodingType.GetBytes($Chars, 0, $CharsRead) }
+     
+    return $OutBytes
+}
+
+function Read-StdErr {
+    Param ([Diagnostics.Process]$Process)
     
-    if($FuncVars["StdOutReadOperation"].IsCompleted)
-    {
-      $StdOutBytesRead = $FuncVars["Process"].StandardOutput.BaseStream.EndRead($FuncVars["StdOutReadOperation"])
-      if($StdOutBytesRead -eq 0){break}
-      $Data += $FuncVars["StdOutDestinationBuffer"][0..([int]$StdOutBytesRead-1)]
-      $FuncVars["StdOutReadOperation"] = $FuncVars["Process"].StandardOutput.BaseStream.BeginRead($FuncVars["StdOutDestinationBuffer"], 0, 65536, $null, $null)
-    }
-    if($FuncVars["StdErrReadOperation"].IsCompleted)
-    {
-      $StdErrBytesRead = $FuncVars["Process"].StandardError.BaseStream.EndRead($FuncVars["StdErrReadOperation"])
-      if($StdErrBytesRead -eq 0){break}
-      $Data += $FuncVars["StdErrDestinationBuffer"][0..([int]$StdErrBytesRead-1)]
-      $FuncVars["StdErrReadOperation"] = $FuncVars["Process"].StandardError.BaseStream.BeginRead($FuncVars["StdErrDestinationBuffer"], 0, 65536, $null, $null)
-    }
-    return $Data,$FuncVars
-  }
-  function WriteData_CMD
-  {
-    param($Data,$FuncVars)
-    $FuncVars["Process"].StandardInput.WriteLine($FuncVars["Encoding"].GetString($Data).TrimEnd("`r").TrimEnd("`n"))
-    return $FuncVars
-  }
-  function Close_CMD
-  {
-    param($FuncVars)
-    $FuncVars["Process"] | Stop-Process
-  }  
+    #$EncodingType = [System.Text.Encoding]::ASCII
+
+    $Chars = New-Object char[] 65536
+    $CharsRead = $Process.StandardError.Read($Chars, 0, $Chars.Length)
+
+    if ($CharsRead) { $ErrBytes = $EncodingType.GetBytes($Chars, 0, $CharsRead) }
+     
+    return $ErrBytes
+}
+
+function Write-StdIn {
+    Param ([Diagnostics.Process]$Process, [Byte[]]$Data)
+    
+    $Process.StandardInput.WriteLine($EncodingType.GetString($Data).TrimEnd("`r").TrimEnd("`n"))
+}
+
+function Close-ProcessStreams {
+    Param ([Diagnostics.Process]$Process)
+    
+    $Process.Kill()
+}  
