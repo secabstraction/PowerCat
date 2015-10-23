@@ -20,24 +20,50 @@
 
     Write-Verbose "Starting process: $FileName $Arguments"
 
-    try { [Diagnostics.Process]::Start($ProcessStartInfo) }
+    try { $Process = [Diagnostics.Process]::Start($ProcessStartInfo) }
     catch {
         Write-Error -Message "Unable to start $FileName $Arguments $($_.Exception.Message)" 
         return
     }
+
+    $ReadStdOut = {
+        Param ([Diagnostics.Process]$Process)
+    
+        $EncodingType = [Text.Encoding]::ASCII
+
+        $Chars = New-Object char[] 65536
+        $CharsRead = $Process.StandardOutput.Read($Chars, 0, $Chars.Length)
+
+        if ($CharsRead) { $OutBytes = $EncodingType.GetBytes($Chars, 0, $CharsRead) }
+     
+        return $OutBytes
+    }
+
+    $Read = [PowerShell]::Create().AddScript($ReadStdOut).AddParameter('Process',$Process)
+
+    $Properties = @{
+        ReadStdOut = $Read
+        Process = $Process
+    }
+
+    $Stream = New-Object -TypeName psobject -Property $Properties
+    return $Stream, $Read.BeginInvoke()
 }
 
 function Read-StdOut {
-    Param ([Diagnostics.Process]$Process)
+    Param ($Stream, $Result)
+
+    $Command = $Stream.ReadStdOut.EndInvoke($Result)
+    $NewResult = $Stream.ReadStdOut.BeginInvoke()
+
+    while ($true) {
+        if ($NewResult.IsCompleted) { 
+            $CommandOutput = $Stream.ReadStdOut.EndInvoke($NewResult)
+            break
+        }
+    }
     
-    #$EncodingType = [System.Text.Encoding]::ASCII
-
-    $Chars = New-Object char[] 65536
-    $CharsRead = $Process.StandardOutput.Read($Chars, 0, $Chars.Length)
-
-    if ($CharsRead) { $OutBytes = $EncodingType.GetBytes($Chars, 0, $CharsRead) }
-     
-    return $OutBytes
+    return $CommandOutput, $Stream.ReadStdOut.BeginInvoke()
 }
 
 function Read-StdErr {
