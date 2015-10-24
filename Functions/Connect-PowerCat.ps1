@@ -178,7 +178,7 @@
                 $ScriptBlock = $null
 
                 if ($BytesToSend.Count) { 
-                    Write-NetworkStream -Mode $Mode -Stream $NetworkStream -Bytes $BytesToSend 
+                    Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend 
                     $BytesToSend = $null
                 }
             }
@@ -187,8 +187,13 @@
                 if ($OutputType -eq 'Bytes') { $ReceivedBytes | Out-File -Append -FilePath $OutputFile }
                 elseif ($OutputType -eq 'String') { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile }
             }
-            else { Write-Output $ReceivedBytes }
+            else { # Console
+                if ($OutputType -eq 'Bytes') { Write-Output $ReceivedBytes }
+                elseif ($OutputType -eq 'String') { Write-Output $EncodingType.GetString($ReceivedBytes) }
+            }
         }
+
+        ##### OLD CODE #####
         try { $IOStream = Open-IOStream $Stream2SetupVars }
         catch { Write-Warning "Failed to open IO stream. $($_.Exception.Message)" ; break }
       
