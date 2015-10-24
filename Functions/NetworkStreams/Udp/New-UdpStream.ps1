@@ -6,27 +6,15 @@
         [Parameter(Position = 0, ParameterSetName = 'Listener', Mandatory = $true)]
         [Switch]$Listener,
         
-        [Parameter(Mandatory = $true)]
+        [Parameter(Position = 1, Mandatory = $true)]
         [Int]$Port, 
         
         [Parameter()]
         [Int]$BufferSize = 65536,
         
         [Parameter()]
-        [Int]$Timeout,
-
-        [Parameter()]
-        [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
-        [String]$Encoding = 'Ascii'
-    )    
-    
-    switch ($Encoding) {
-          'Ascii' { $EncodingType = New-Object Text.AsciiEncoding }
-        'Unicode' { $EncodingType = New-Object Text.UnicodeEncoding }
-           'UTF7' { $EncodingType = New-Object Text.UTF7Encoding }
-           'UTF8' { $EncodingType = New-Object Text.UTF8Encoding }
-          'UTF32' { $EncodingType = New-Object Text.UTF32Encoding }
-    }
+        [Int]$Timeout = 60
+    )
 
     if ($Listener.IsPresent) {
 
@@ -76,23 +64,23 @@
         Write-Verbose "Connection from $($RemoteEndPoint.Address.IPAddressToString):$($RemoteEndPoint.Port) [udp] accepted."
 
         $Properties = @{
-            Encoding = $EncodingType
             UdpClient = $UdpClient
+            Socket = $UdpClient.Client
             RemoteEndPoint = $RemoteEndPoint
             InitialConnectionBytes = $InitialConnectionBytes
         }
     }        
-    else { 
+    else { # Client
         $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @($ServerIp, $Port) 
         $UdpClient = New-Object Net.Sockets.UDPClient
         $UdpClient.Connect($RemoteEndPoint)
 
         Write-Verbose "Sending UDP traffic to $($ServerIp.IPAddressToString):$Port"
-        Write-Verbose "Make sure to send some data so the server!"
+        Write-Verbose "Make sure to send some data to the server!"
 
         $Properties = @{
-            Encoding = $EncodingType
             UdpClient = $UdpClient
+            Socket = $UdpClient.Client
             RemoteEndPoint = $RemoteEndPoint
         }
     }

