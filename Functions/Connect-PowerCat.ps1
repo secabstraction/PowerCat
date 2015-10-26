@@ -184,7 +184,7 @@
 
             # Get data from the network
             if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.Socket.Available }
-            elseif ($ClientStream.Pipe.InBufferSize) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.Pipe.InBufferSize }
+            elseif ($ClientStream.InBufferSize) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.InBufferSize }
             else { continue }
 
             # Redirect received bytes
