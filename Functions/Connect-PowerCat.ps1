@@ -59,7 +59,7 @@
         }
 
         if ($Execute.IsPresent) { 
-            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -Mandatory -ParameterDictionary $ParameterDictionary 
+            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
 
@@ -74,14 +74,16 @@
             'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
         }
 
-        if ($PSCmdlet.ParameterSetName -eq 'Execute') {
+        if ($ParameterDictionary.ScriptBlock.Value) {
             
             Write-Verbose "Executing scriptblock..."
 
             $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
             
-            try { $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String)) }
-            catch { $BytesToSend += $EncodingType.GetBytes(($_ | Out-String)) }
+            $Error.Clear()
+            
+            $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
+            if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
             $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
             
             $ScriptBlock = $null
@@ -94,7 +96,7 @@
             if ((Test-Path $Input)) { $BytesToSend = [IO.File]::ReadAllBytes($Input) }     
             elseif ($Input.GetType() -eq [Byte[]]) { $BytesToSend = $Input }
             elseif ($Input.GetType() -eq [String]) { $BytesToSend = $EncodingType.GetBytes($Input) }
-            else { Write-Warning 'Incompatible input type.' ; return }
+            else { Write-Warning 'Incompatible input type.' ; exit }
         }
 
         elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
@@ -137,12 +139,12 @@
         switch ($Mode) {
            'Icmp' { 
                 try { $ClientStream = New-IcmpStream $ServerIp -BindAddress $ParameterDictionary.BindAddress.Value }
-                catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
+                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Smb' { 
                 try { $ClientStream = New-SmbStream $ServerIp -PipeName $ParameterDictionary.PipeName.Value  }
-                catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
+                catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Tcp' { 
@@ -156,15 +158,37 @@
                 continue 
             }
         }
-    }
-    Process {   
       
         if ($BytesToSend.Count) { Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend }
-
-        if ($ClientStream.Socket.Available -or $ClientStream.Pipe.InBufferSize) { 
-            
-            $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream
         
+        [console]::TreatControlCAsInput = $true
+    }
+    Process {           
+
+        while ($true) {
+            
+            if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
+
+            # Catch Ctrl+C / Read-Host
+            if ([console]::KeyAvailable) {          
+                $Key = [console]::ReadKey($true)
+                if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
+                    Write-Warning 'Caught escape sequence, stopping PowerCat.'
+                    break
+                }
+                if ($PSCmdlet.ParameterSetName -eq 'Console') { 
+                    Write-Host -NoNewline $Key.KeyChar
+                    $BytesToSend = $EncodingType.GetBytes($Key.KeyChar + (Read-Host) + "`n") 
+                    Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend
+                }
+            }
+
+            # Get data from the network
+            if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.Socket.Available }
+            elseif ($ClientStream.Pipe.InBufferSize) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.Pipe.InBufferSize }
+            else { continue }
+
+            # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {
             
                 $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes))
@@ -181,56 +205,38 @@
                     Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend 
                     $BytesToSend = $null
                 }
+                continue
             }
-            elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream -Mode $RelayMode -Stream $RelayStream -Bytes $ReceivedBytes }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { 
+                Write-NetworkStream -Mode $RelayMode -Stream $RelayStream -Bytes $ReceivedBytes 
+                continue
+            }
             elseif ($PSBoundParameters.OutputFile) { 
-                if ($OutputType -eq 'Bytes') { $ReceivedBytes | Out-File -Append -FilePath $OutputFile }
-                elseif ($OutputType -eq 'String') { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile }
+                if ($OutputType -eq 'Bytes') { 
+                    $FileStream = New-Object IO.FileStream -ArgumentList @($OutputFile,[IO.FileMode]::Append)
+                    [void]$FileStream.Seek(0, [IO.SeekOrigin]::End) 
+                    $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) 
+                    $FileStream.Flush() 
+                    $FileStream.Dispose() 
+                    continue
+                }
+                elseif ($OutputType -eq 'String') { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile ; continue }
             }
-            else { # Console
+            else { # StdOut
                 if ($OutputType -eq 'Bytes') { Write-Output $ReceivedBytes }
                 elseif ($OutputType -eq 'String') { Write-Output $EncodingType.GetString($ReceivedBytes) }
             }
         }
-
-        ##### OLD CODE #####
-        try { $IOStream = Open-IOStream $Stream2SetupVars }
-        catch { Write-Warning "Failed to open IO stream. $($_.Exception.Message)" ; break }
-      
-        $Data = $null
-      
-        if ($InputToWrite) {
-            Write-Verbose "Writing input to network stream..."
-
-            try { $NetworkStream = Write-NetworkStream -Stream $NetworkStream -Data $InputToWrite }
-            catch { Write-Warning "Failed to write input to network stream. $($_.Exception.Message)" ; break }
-        }
-      
-        if ($Disconnect.IsPresent) { Write-Verbose "-d (disconnect) Activated. Disconnecting..." ; break }
-      
-        Write-Verbose "Both Communication Streams Established. Redirecting Data Between Streams..."
-      
-        while ($true) {
-            try {
-                $Data, $IOStream = Read-IOStream -Stream $IOStream
-                if ($Data) { $NetworkStream = Write-NetworkStream -Stream $NetworkStream -Data $Data }
-                $Data = $null
-            }
-            catch { Write-Warning "Failed to redirect data from IO stream to network stream. $($_.Exception.Message)" ; break }
-        
-            try {
-                $Data, $NetworkStream = Read-NetworkStream -Stream $NetworkStream
-                if ($Data) { $IOStream = Write-IOStream -Stream $IOStream -Data $Data }
-                $Data = $null
-            }
-            catch { Write-Warning "Failed to redirect data from network stream to IO stream. $($_.Exception.Message)" ; break }
-        }
     }
-    End {      
-        try { Close-IOStream -Stream $IOStream }
-        catch { Write-Warning "Failed to close IO stream. $($_.Exception.Message)" }
+    End {   
+        [console]::TreatControlCAsInput = $false
       
-        try { Close-NetworkStream -Stream $NetworkStream }
-        catch { Write-Warning "Failed to close network stream. $($_.Exception.Message)" }
+        try { Close-NetworkStream -Mode $Mode -Stream $ClientStream }
+        catch { Write-Warning "Failed to close client stream. $($_.Exception.Message)" }
+
+        if ($PSCmdlet.ParameterSetName -eq 'Relay') {
+            try { Close-NetworkStream -Mode $RelayMode -Stream $RelayStream }
+            catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
+        }
     }
 }
