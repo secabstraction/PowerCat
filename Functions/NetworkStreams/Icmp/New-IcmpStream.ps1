@@ -1,9 +1,13 @@
 ﻿function New-IcmpStream {
+[CmdletBinding(DefaultParameterSetName = 'Client')]
     Param (
-        [Parameter(Position = 0)]
+        [Parameter(Position = 0, ParameterSetName = 'Client', Mandatory = $true)]
         [Net.IPAddress]$ServerIp,
+        
+        [Parameter(Position = 0, ParameterSetName = 'Listener', Mandatory = $true)]
+        [Switch]$Listener,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Position = 1, Mandatory = $true)]
         [String]$BindAddress,
         
         [Parameter()]
@@ -20,7 +24,7 @@
     
     Write-Verbose "Listening on $($IcmpSocket.LocalEndPoint.Address.IPAddressToString) [icmp]"
 
-    if (!($PSBoundParameters.ServerIp)) { # Listener
+    if ($Listener.IsPresent) {
         
         $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @([Net.IPAddress]::Any, $null)
         

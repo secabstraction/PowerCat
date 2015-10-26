@@ -1,4 +1,5 @@
 ﻿function New-UdpStream {
+[CmdletBinding(DefaultParameterSetName = 'Client')]
     Param (
         [Parameter(Position = 0, ParameterSetName = 'Client', Mandatory = $true)]
         [Net.IPAddress]$ServerIp,
