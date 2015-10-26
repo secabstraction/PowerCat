@@ -155,7 +155,6 @@
             'Udp' { 
                 try { $ClientStream = New-UdpStream $ServerIp $Port }
                 catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; exit }
-                continue 
             }
         }
       
