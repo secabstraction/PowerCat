@@ -2,7 +2,7 @@
 [CmdletBinding(DefaultParameterSetName = 'Console')]
     Param (
         [Parameter(Position = 0, Mandatory = $true)]
-        [Alias("m")]
+        [Alias('m')]
         [ValidateSet('Icmp', 'Smb', 'Tcp', 'Udp')]
         [String]$Mode,
         
@@ -11,33 +11,34 @@
         [Switch]$Execute,
     
         [Parameter(ParameterSetName = 'Input')]
-        [Alias("i")]
+        [Alias('i')]
         [Object]$Input,
         
         [Parameter(ParameterSetName = 'Relay')]
-        [Alias("r")]
+        [Alias('r')]
         [String]$Relay,
-    
-        [Parameter()]
-        [Alias("t")]
-        [Int]$Timeout = 60,
-    
-        [Parameter()]
-        [Alias("o")]
-        [ValidateSet('Host','Bytes','String')]
-        [String]$OutputType = 'Host',
 
-        [Parameter()]
-        [Alias("of")]
-        [String]$OutputFile = "",
+        [Parameter(ParameterSetName = 'OutFile')]
+        [Alias('of')]
+        [String]$OutputFile,
+    
+        [Parameter(ParameterSetName = 'OutFile', Mandatory = $true)]
+        [Parameter(ParameterSetName = 'Console', Mandatory = $true)]
+        [Alias('ot')]
+        [ValidateSet('Bytes','String')]
+        [String]$OutputType,
     
         [Parameter()]
-        [Alias("d")]
+        [Alias('d')]
         [Switch]$Disconnect,
     
         [Parameter()]
-        [Alias("rep")]
-        [Switch]$Repeater,
+        [Alias('k')]
+        [Switch]$KeepAlive,
+    
+        [Parameter()]
+        [Alias('t')]
+        [Int]$Timeout = 60,
         
         [Parameter()]
         [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
@@ -54,7 +55,7 @@
         }
 
         if ($Execute.IsPresent) { 
-            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -Mandatory -ParameterDictionary $ParameterDictionary 
+            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
 
@@ -68,28 +69,15 @@
              'UTF8' { $EncodingType = New-Object Text.UTF8Encoding ; continue }
             'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
         }
-
-        if ($PSCmdlet.ParameterSetName -eq 'Execute') {
-            
-            Write-Verbose "Executing scriptblock..."
-
-            $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
-            
-            try { $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String)) }
-            catch { $BytesToSend += $EncodingType.GetBytes(($_ | Out-String)) }
-            $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
-            
-            $ScriptBlock = $null
-        }
       
-        elseif ($PSCmdlet.ParameterSetName -eq 'Input') {   
+        if ($PSCmdlet.ParameterSetName -eq 'Input') {   
             
             Write-Verbose 'Parsing input...'
 
             if ((Test-Path $Input)) { $BytesToSend = [IO.File]::ReadAllBytes($Input) }     
             elseif ($Input.GetType() -eq [Byte[]]) { $BytesToSend = $Input }
             elseif ($Input.GetType() -eq [String]) { $BytesToSend = $EncodingType.GetBytes($Input) }
-            else { Write-Warning 'Incompatible input type.' ; return }
+            else { Write-Warning 'Incompatible input type.' ; exit }
         }
 
         elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
@@ -103,108 +91,140 @@
                 $RelayMode = $RelayConfig[0].ToLower()
 
                 switch ($RelayMode) {
-                   'icmp' { $RelayStream = New-IcmpStream -BindAddress $RelayConfig[1] ; continue }
-                    'smb' { $RelayStream = New-SmbStream -PipeName $RelayConfig[1] ; continue }
-                    'tcp' { 
-                        if (!(Test-Port -Number $Port -Transport Tcp)) { exit }
-                        $RelayStream = New-TcpStream -Port $RelayConfig[1]
-                        continue 
-                    }
-                    'udp' { 
-                        if (!(Test-Port -Number $Port -Transport Udp)) { exit }
-                        $RelayStream = New-UdpStream -Port $RelayConfig[1]
-                        continue 
-                    }
+                   'icmp' { $RelayStream = New-IcmpStream -Listener $RelayConfig[1] ; continue }
+                    'smb' { $RelayStream = New-SmbStream -Listener $RelayConfig[1] ; continue }
+                    'tcp' { $RelayStream = New-TcpStream -Listener $RelayConfig[1] ; continue }
+                    'udp' { $RelayStream = New-UdpStream -Listener $RelayConfig[1] ; continue }
                     default { Write-Warning 'Invalid relay mode specified.' ; exit }
                 }
             }
             elseif ($RelayConfig.Count -eq 3) { # Client
                 
                 $RelayMode = $RelayConfig[0].ToLower()
+                $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
 
                 switch ($RelayMode) {
-                   'icmp' { $RelayStream = New-IcmpStream -RemoteIp $RelayConfig[2] -BindAddress $RelayConfig[1] ; continue }
-                    'smb' { $RelayStream = New-SmbStream -RemoteIp $RelayConfig[2] -PipeName $RelayConfig[1] ; continue }
-                    'tcp' { $RelayStream = New-TcpStream -RemoteIp $RelayConfig[2] -Port $RelayConfig[1] ; continue }
-                    'udp' { $RelayStream = New-UdpStream -RemoteIp $RelayConfig[2] -Port $RelayConfig[1] ; continue }
+                   'icmp' { $RelayStream = New-IcmpStream $ServerIp $RelayConfig[2] ; continue }
+                    'smb' { $RelayStream = New-SmbStream $RelayConfig[1] $RelayConfig[2] ; continue }
+                    'tcp' { $RelayStream = New-TcpStream $ServerIp $RelayConfig[2] ; continue }
+                    'udp' { $RelayStream = New-UdpStream $ServerIp $RelayConfig[2] ; continue }
                     default { Write-Warning 'Invalid relay mode specified.' ; exit }
                 }
             }
-            else { Write-Warning 'Invalid relay format.' ; exit }
+            else { Write-Error 'Invalid relay format.' -ErrorAction Stop }
         }
           
+        elseif ($ParameterDictionary.ScriptBlock.Value) {
+            
+            Write-Verbose 'Executing scriptblock...'
+
+            $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
+            
+            $Error.Clear()
+            
+            $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
+            if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
+            $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+            
+            $ScriptBlock = $null
+        }
+
         Write-Verbose "Setting up network stream..."
 
         switch ($Mode) {
            'Icmp' { 
-                try { $NetworkStream = New-IcmpStream -RemoteIp $RemoteIp -BindAddress $ParameterDictionary.BindAddress.Value }
-                catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
+                try { $InitialBytes, $ServerStream = New-IcmpStream -Listener $ParameterDictionary.BindAddress.Value }
+                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Smb' { 
-                try { $NetworkStream = New-SmbStream -RemoteIp $RemoteIp -PipeName $ParameterDictionary.PipeName.Value  }
-                catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
+                try { $ServerStream = New-SmbStream -Listener $ParameterDictionary.PipeName.Value  }
+                catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Tcp' { 
-                if (!(Test-Port -Number $Port -Transport Tcp)) { exit }
-                try { $NetworkStream = New-TcpStream -RemoteIp $RemoteIp -Port $Port  }
+                try { $ServerStream = New-TcpStream -Listener $Port }
                 catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Udp' { 
-                if (!(Test-Port -Number $Port -Transport Udp)) { exit }
-                try { $NetworkStream = New-UdpStream -RemoteIp $RemoteIp -Port $Port  }
+                try { $InitialBytes, $ServerStream = New-UdpStream -Listener $Port }
                 catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; exit }
-                continue 
             }
         }
+      
+        if ($BytesToSend.Count) { Write-NetworkStream $Mode $ServerStream $BytesToSend }
+        
+        [console]::TreatControlCAsInput = $true
     }
-    Process {     
-        Write-Verbose "Setting up network stream..."
-        
-        try { $NetworkStream = Open-NetworkStream $Stream1SetupVars }
-        catch { Write-Warning "Failed to open network stream. $($_.Exception.Message)" ; break }
-      
-        Write-Verbose "Setting up IO stream..."
-        
-        try { $IOStream = Open-IOStream $Stream2SetupVars }
-        catch { Write-Warning "Failed to open IO stream. $($_.Exception.Message)" ; break }
-      
-        $Data = $null
-      
-        if ($InputToWrite) {
-            Write-Verbose "Writing input to network stream..."
+    Process {           
+    
+        if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
 
-            try { $NetworkStream = Write-NetworkStream -Stream $NetworkStream -Data $InputToWrite }
-            catch { Write-Warning "Failed to write input to network stream. $($_.Exception.Message)" ; break }
-        }
-      
-        if ($Disconnect.IsPresent) { Write-Verbose "-d (disconnect) Activated. Disconnecting..." ; break }
-      
-        Write-Verbose "Both Communication Streams Established. Redirecting Data Between Streams..."
-      
         while ($true) {
-            try {
-                $Data, $IOStream = Read-IOStream -Stream $IOStream
-                if ($Data) { $NetworkStream = Write-NetworkStream -Stream $NetworkStream -Data $Data }
-                $Data = $null
+            
+            # Catch Ctrl+C / Read-Host
+            if ([console]::KeyAvailable) {          
+                $Key = [console]::ReadKey($true)
+                if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
+                    Write-Warning 'Caught escape sequence, stopping PowerCat.'
+                    break
+                }
+                if ($PSCmdlet.ParameterSetName -eq 'Console') { 
+                    Write-Host -NoNewline $Key.KeyChar
+                    $BytesToSend = $EncodingType.GetBytes($Key.KeyChar + (Read-Host) + "`n") 
+                    Write-NetworkStream $Mode $ServerStream $BytesToSend
+                }
             }
-            catch { Write-Warning "Failed to redirect data from IO stream to network stream. $($_.Exception.Message)" ; break }
-        
-            try {
-                $Data, $NetworkStream = Read-NetworkStream -Stream $NetworkStream
-                if ($Data) { $IOStream = Write-IOStream -Stream $IOStream -Data $Data }
-                $Data = $null
+
+            # Get data from the network
+            if ($ServerStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream $ServerStream.Socket.Available }
+            elseif ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream }
+            else { continue }
+
+            # Redirect received bytes
+            if ($PSCmdlet.ParameterSetName -eq 'Execute') {
+            
+                $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes))
+            
+                $Error.Clear()
+
+                $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke() | Out-String))
+                if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
+                $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+            
+                Write-NetworkStream $Mode $ServerStream $BytesToSend 
+                $BytesToSend = $null
+                $ScriptBlock = $null
+                continue
             }
-            catch { Write-Warning "Failed to redirect data from network stream to IO stream. $($_.Exception.Message)" ; break }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream $RelayMode $RelayStream $ReceivedBytes ; continue }
+            elseif ($PSCmdlet.ParameterSetName -eq 'OutFile') { 
+                if ($OutputType -eq 'Bytes') { 
+                    $FileStream = New-Object IO.FileStream -ArgumentList @($OutputFile, [IO.FileMode]::Append)
+                    [void]$FileStream.Seek(0, [IO.SeekOrigin]::End) 
+                    $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) 
+                    $FileStream.Flush() 
+                    $FileStream.Dispose() 
+                    continue
+                }
+                else { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile ; continue }
+            }
+            else { # StdOut
+                if ($OutputType -eq 'Bytes') { Write-Output $ReceivedBytes }
+                else { Write-Output $EncodingType.GetString($ReceivedBytes) }
+            }
         }
     }
-    End {      
-        try { Close-IOStream -Stream $IOStream }
-        catch { Write-Warning "Failed to close IO stream. $($_.Exception.Message)" }
+    End {   
+        [console]::TreatControlCAsInput = $false
       
-        try { Close-NetworkStream -Stream $NetworkStream }
-        catch { Write-Warning "Failed to close network stream. $($_.Exception.Message)" }
+        try { Close-NetworkStream $Mode $ServerStream }
+        catch { Write-Warning "Failed to close client stream. $($_.Exception.Message)" }
+
+        if ($PSCmdlet.ParameterSetName -eq 'Relay') {
+            try { Close-NetworkStream $RelayMode $RelayStream }
+            catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
+        }
     }
 }

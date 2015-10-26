@@ -2,13 +2,13 @@
 [CmdletBinding(DefaultParameterSetName = 'Console')]
     Param (
         [Parameter(Position = 0, Mandatory = $true)]
-        [Alias("m")]
+        [Alias('m')]
         [ValidateSet('Icmp', 'Smb', 'Tcp', 'Udp')]
         [String]$Mode,
 
         [Parameter(Position = 1, Mandatory = $true)]
         [ValidatePattern("^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")]
-        [Alias("c")]
+        [Alias('c')]
         [String]$RemoteIp,
         
         [Parameter(ParameterSetName = 'Execute')]
@@ -16,33 +16,34 @@
         [Switch]$Execute,
     
         [Parameter(ParameterSetName = 'Input')]
-        [Alias("i")]
+        [Alias('i')]
         [Object]$Input,
         
         [Parameter(ParameterSetName = 'Relay')]
-        [Alias("r")]
+        [Alias('r')]
         [String]$Relay,
-    
-        [Parameter()]
-        [Alias("t")]
-        [Int]$Timeout = 60,
-    
-        [Parameter()]
-        [Alias("o")]
-        [ValidateSet('Bytes','String')]
-        [String]$OutputType = 'Bytes',
 
-        [Parameter()]
-        [Alias("of")]
-        [String]$OutputFile = "",
+        [Parameter(ParameterSetName = 'OutFile')]
+        [Alias('of')]
+        [String]$OutputFile,
+    
+        [Parameter(ParameterSetName = 'OutFile', Mandatory = $true)]
+        [Parameter(ParameterSetName = 'Console', Mandatory = $true)]
+        [Alias('ot')]
+        [ValidateSet('Bytes','String')]
+        [String]$OutputType,
     
         [Parameter()]
-        [Alias("d")]
+        [Alias('d')]
         [Switch]$Disconnect,
     
         [Parameter()]
-        [Alias("rep")]
-        [Switch]$Repeat,
+        [Alias('k')]
+        [Switch]$KeepAlive,
+    
+        [Parameter()]
+        [Alias('t')]
+        [Int]$Timeout = 60,
         
         [Parameter()]
         [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
@@ -120,7 +121,7 @@
           
         elseif ($ParameterDictionary.ScriptBlock.Value) {
             
-            Write-Verbose "Executing scriptblock..."
+            Write-Verbose 'Executing scriptblock...'
 
             $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
             
@@ -139,12 +140,12 @@
 
         switch ($Mode) {
            'Icmp' { 
-                try { $ClientStream = New-IcmpStream $ServerIp -BindAddress $ParameterDictionary.BindAddress.Value }
+                try { $InitialBytes, $ClientStream = New-IcmpStream $ServerIp $ParameterDictionary.BindAddress.Value }
                 catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
             'Smb' { 
-                try { $ClientStream = New-SmbStream $RemoteIp -PipeName $ParameterDictionary.PipeName.Value  }
+                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value  }
                 catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; exit }
                 continue 
             }
@@ -154,21 +155,21 @@
                 continue 
             }
             'Udp' { 
-                try { $ClientStream = New-UdpStream $ServerIp $Port }
+                try { $InitialBytes, $ClientStream = New-UdpStream $ServerIp $Port }
                 catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; exit }
             }
         }
       
-        if ($BytesToSend.Count) { Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend }
+        if ($BytesToSend.Count) { Write-NetworkStream $Mode $ClientStream $BytesToSend }
         
         [console]::TreatControlCAsInput = $true
     }
     Process {           
+    
+        if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
 
         while ($true) {
             
-            if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
-
             # Catch Ctrl+C / Read-Host
             if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey($true)
@@ -179,13 +180,13 @@
                 if ($PSCmdlet.ParameterSetName -eq 'Console') { 
                     Write-Host -NoNewline $Key.KeyChar
                     $BytesToSend = $EncodingType.GetBytes($Key.KeyChar + (Read-Host) + "`n") 
-                    Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend
+                    Write-NetworkStream $Mode $ClientStream $BytesToSend
                 }
             }
 
             # Get data from the network
-            if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.Socket.Available }
-            elseif ($ClientStream.InBufferSize) { $ReceivedBytes = Read-NetworkStream -Mode $Mode -Stream $ClientStream -Size $ClientStream.InBufferSize }
+            if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available }
+            elseif ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream }
             else { continue }
 
             # Redirect received bytes
@@ -199,43 +200,37 @@
                 if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
                 $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
             
+                Write-NetworkStream $Mode $ClientStream $BytesToSend 
+                $BytesToSend = $null
                 $ScriptBlock = $null
-
-                if ($BytesToSend.Count) { 
-                    Write-NetworkStream -Mode $Mode -Stream $ClientStream -Bytes $BytesToSend 
-                    $BytesToSend = $null
-                }
                 continue
             }
-            elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { 
-                Write-NetworkStream -Mode $RelayMode -Stream $RelayStream -Bytes $ReceivedBytes 
-                continue
-            }
-            elseif ($PSBoundParameters.OutputFile) { 
+            elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream $RelayMode $RelayStream $ReceivedBytes ; continue }
+            elseif ($PSCmdlet.ParameterSetName -eq 'OutFile') { 
                 if ($OutputType -eq 'Bytes') { 
-                    $FileStream = New-Object IO.FileStream -ArgumentList @($OutputFile,[IO.FileMode]::Append)
+                    $FileStream = New-Object IO.FileStream -ArgumentList @($OutputFile, [IO.FileMode]::Append)
                     [void]$FileStream.Seek(0, [IO.SeekOrigin]::End) 
                     $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) 
                     $FileStream.Flush() 
                     $FileStream.Dispose() 
                     continue
                 }
-                elseif ($OutputType -eq 'String') { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile ; continue }
+                else { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile ; continue }
             }
             else { # StdOut
                 if ($OutputType -eq 'Bytes') { Write-Output $ReceivedBytes }
-                elseif ($OutputType -eq 'String') { Write-Output $EncodingType.GetString($ReceivedBytes) }
+                else { Write-Output $EncodingType.GetString($ReceivedBytes) }
             }
         }
     }
     End {   
         [console]::TreatControlCAsInput = $false
       
-        try { Close-NetworkStream -Mode $Mode -Stream $ClientStream }
+        try { Close-NetworkStream $Mode $ClientStream }
         catch { Write-Warning "Failed to close client stream. $($_.Exception.Message)" }
 
         if ($PSCmdlet.ParameterSetName -eq 'Relay') {
-            try { Close-NetworkStream -Mode $RelayMode -Stream $RelayStream }
+            try { Close-NetworkStream $RelayMode $RelayStream }
             catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
         }
     }

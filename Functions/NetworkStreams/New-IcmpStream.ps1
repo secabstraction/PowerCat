@@ -31,7 +31,7 @@
         $SocketDestinationBuffer = New-Object Byte[] -ArgumentList 65536
         $PacketInfo = New-Object Net.Sockets.IPPacketInformation
                 
-        $ConnectHandle = $IcmpSocket.BeginReceiveFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
+        $ConnectResult = $IcmpSocket.BeginReceiveFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
         
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
         [console]::TreatControlCAsInput = $true
@@ -40,60 +40,53 @@
             if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey($true)
                 if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
-                    Write-Warning "Caught escape sequence, stopping UDP Setup."
+                    Write-Warning 'Caught escape sequence, stopping UDP Setup.'
+                    [console]::TreatControlCAsInput = $false
+                    $SocketDestinationBuffer = $null
                     $IcmpSocket.Close()
                     $Stopwatch.Stop()
-                    $SocketDestinationBuffer = $null
-                    [console]::TreatControlCAsInput = $false
-                    exit
+                    return
                 }
             }
 
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning "Timeout exceeded, stopping UDP Setup."
+                [console]::TreatControlCAsInput = $false
+                $SocketDestinationBuffer = $null
                 $IcmpSocket.Close()
                 $Stopwatch.Stop()
-                $SocketDestinationBuffer = $null
-                [console]::TreatControlCAsInput = $false
-                exit
+                return
             }
-        } until ($ConnectHandle.IsCompleted)
+        } until ($ConnectResult.IsCompleted)
         
         [console]::TreatControlCAsInput = $false
         $Stopwatch.Stop()
 
         $SocketFlags = 0
-        $SocketBytesRead = $IcmpSocket.EndReceiveFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
+        $SocketBytesRead = $IcmpSocket.EndReceiveFrom($ConnectResult, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
                 
-        if ($SocketBytesRead.Count -gt 0) { $InitialConnectionBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
+        if ($SocketBytesRead.Count) { $InitialBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
 
         Write-Verbose "Connection from $($RemoteEndPoint.Address.IPAddressToString) [icmp] accepted."
 
         $Properties = @{
             Socket = $IcmpSocket
             RemoteEndpoint = $RemoteEndPoint
-            InitialConnectionBytes = $InitialConnectionBytes
         }
+        $IcmpStream = New-Object -TypeName psobject -Property $Properties
     }        
     else { # Client
         $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @($ServerIp, $null) 
         $IcmpSocket.Connect($RemoteEndPoint)
 
         Write-Verbose "Sending ICMP traffic to $($ServerIp.IPAddressToString)"
-        Write-Verbose "Make sure to send some data so the server!"
+        Write-Verbose "Make sure to send some data to the server!"
 
         $Properties = @{
             Socket = $IcmpSocket
             RemoteEndpoint = $RemoteEndpoint
         }
+        $IcmpStream = New-Object -TypeName psobject -Property $Properties
     }
-    
-    #$StreamDestinationBuffer = New-Object byte[] -ArgumentList $BufferSize
-    #$StreamReadOperation = $IcmpSocket.BeginReceiveFrom($StreamDestinationBuffer, 0, $BufferSize, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndpoint, $null, $null)
-    
-    #[void]$Properties.Add('BufferSize', $BufferSize)
-    #[void]$Properties.Add('Buffer', $StreamDestinationBuffer)
-    #[void]$Properties.Add('Read', $StreamReadOperation)
-
-    New-Object -TypeName psobject -Property $Properties
+    return $InitialBytes, $IcmpStream
 }

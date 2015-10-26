@@ -60,7 +60,7 @@
         $SocketFlags = 0
         $SocketBytesRead = $UdpClient.Client.EndReceiveFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
                 
-        if ($SocketBytesRead.Count -gt 0) { $InitialConnectionBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
+        if ($SocketBytesRead.Count) { $InitialBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
 
         Write-Verbose "Connection from $($RemoteEndPoint.Address.IPAddressToString):$($RemoteEndPoint.Port) [udp] accepted."
 
@@ -68,8 +68,8 @@
             UdpClient = $UdpClient
             Socket = $UdpClient.Client
             RemoteEndPoint = $RemoteEndPoint
-            InitialConnectionBytes = $InitialConnectionBytes
         }
+        $UdpStream = New-Object -TypeName psobject -Property $Properties
     }        
     else { # Client
         $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @($ServerIp, $Port) 
@@ -84,12 +84,7 @@
             Socket = $UdpClient.Client
             RemoteEndPoint = $RemoteEndPoint
         }
+        $UdpStream = New-Object -TypeName psobject -Property $Properties
     }
-    
-    #$StreamDestinationBuffer = New-Object byte[] -ArgumentList $BufferSize
-
-    #[void]$Properties.Add('BufferSize', $BufferSize)
-    #[void]$Properties.Add('Buffer', $StreamDestinationBuffer)
-
-    New-Object -TypeName psobject -Property $Properties
+    return $InitialBytes, $UdpStream
 }
