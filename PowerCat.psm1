@@ -76,6 +76,7 @@ function New-SmbStream {
             $PipeClient.Dispose()
             return
         }
+        Write-Verbose "Connection to server successful!"
 
         $Buffer = New-Object Byte[] -ArgumentList $BufferSize
 
@@ -711,15 +712,20 @@ function Start-PowerCat {
                 }
                 if ($PSCmdlet.ParameterSetName -eq 'Console') { 
                     $BytesToSend = $EncodingType.GetBytes($Key.KeyChar + (Read-Host) + "`n") 
-                    Write-NetworkStream $Mode $ClientStream $BytesToSend
+                    Write-NetworkStream $Mode $ServerStream $BytesToSend
                 }
             }
 
             # Get data from the network
-            if ($ServerStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream $ServerStream.Socket.Available }
-            elseif ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream }
-            elseif (!$ServerStream.Socket.Connected) { Write-Warning 'Socket disconnected, exiting.' ; break }
-            else { Start-Sleep -Milliseconds 1 ; continue }
+            if ($ServerStream.Socket.Connected) {
+                if ($ServerStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream $ServerStream.Socket.Available }
+                else { Start-Sleep -Milliseconds 1 ; continue }
+            }
+            elseif ($ServerStream.Pipe.IsConnected) { 
+                if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream }
+                else { Start-Sleep -Milliseconds 1 ; continue }
+            }
+            else { Write-Warning 'Connection broken, exiting.' ; break }
 
             # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {
@@ -954,10 +960,15 @@ function Connect-PowerCat {
             }
 
             # Get data from the network
-            if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available }
-            elseif ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream }
-            elseif (!$ClientStream.Socket.Connected) { Write-Warning 'Socket disconnected, exiting.' ; break }
-            else { Sleep -m 1; continue }
+            if ($ClientStream.Socket.Connected) {
+                if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available }
+                else { Start-Sleep -Milliseconds 1 ; continue }
+            }
+            elseif ($ClientStream.Pipe.IsConnected) { 
+                if ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream }
+                else { Start-Sleep -Milliseconds 1 ; continue }
+            }
+            else { Write-Warning 'Connection broken, exiting.' ; break }
 
             # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {

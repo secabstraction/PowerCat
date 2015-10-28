@@ -57,6 +57,7 @@
             $PipeServer.Dispose()
             return
         }
+        Write-Verbose "Connection from client successful!"
 
         $Buffer = New-Object Byte[] -ArgumentList $BufferSize
 
@@ -76,6 +77,7 @@
             $PipeClient.Dispose()
             return
         }
+        Write-Verbose "Connection to server successful!"
 
         $Buffer = New-Object Byte[] -ArgumentList $BufferSize
 
