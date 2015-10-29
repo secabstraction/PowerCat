@@ -30,8 +30,8 @@
             continue 
         }
         'Udp' { 
-            try { $BytesSent = $Stream.UdpClient.Send($Bytes, $Bytes.Length, $Stream.RemoteEndPoint) }
-            catch { Write-Warning "Failed to send Udp data to $($Stream.RemoteEndPoint.ToString()). $($_.Exception.Message)." }
+            try { $BytesSent = $Stream.UdpClient.Send($Bytes, $Bytes.Length) }
+            catch { Write-Warning "Failed to send Udp data to $($Stream.Socket.RemoteEndPoint.ToString()). $($_.Exception.Message)." }
         }
     }
 }

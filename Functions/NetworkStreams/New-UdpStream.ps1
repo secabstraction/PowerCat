@@ -26,7 +26,7 @@
 
         Write-Verbose "Listening on 0.0.0.0:$Port [udp]"
                 
-        $ConnectHandle = $UdpClient.Client.BeginReceiveFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
+        $ConnectHandle = $UdpClient.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
         
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
         [console]::TreatControlCAsInput = $true
@@ -40,7 +40,7 @@
                     $Stopwatch.Stop()
                     $SocketDestinationBuffer = $null
                     [console]::TreatControlCAsInput = $false
-                    exit
+                    return
                 }
             }
 
@@ -50,7 +50,7 @@
                 $Stopwatch.Stop()
                 $SocketDestinationBuffer = $null
                 [console]::TreatControlCAsInput = $false
-                exit
+                return
             }
         } until ($ConnectHandle.IsCompleted)
         
@@ -58,16 +58,17 @@
         $Stopwatch.Stop()
 
         $SocketFlags = 0
-        $SocketBytesRead = $UdpClient.Client.EndReceiveFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
+        $SocketBytesRead = $UdpClient.Client.EndReceiveMessageFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
+        $UdpClient.Connect($RemoteEndPoint)
                 
         if ($SocketBytesRead.Count) { $InitialBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
 
-        Write-Verbose "Connection from $($RemoteEndPoint.Address.IPAddressToString):$($RemoteEndPoint.Port) [udp] accepted."
+        Write-Verbose "Connection from $($RemoteEndPoint.ToString()) [udp] accepted."
 
         $Properties = @{
             UdpClient = $UdpClient
             Socket = $UdpClient.Client
-            RemoteEndPoint = $RemoteEndPoint
+            Read = $UdpClient.BeginReceive($null, $null)
         }
         $UdpStream = New-Object -TypeName psobject -Property $Properties
     }        
@@ -76,13 +77,13 @@
         $UdpClient = New-Object Net.Sockets.UDPClient
         $UdpClient.Connect($RemoteEndPoint)
 
-        Write-Verbose "Sending UDP traffic to $($ServerIp.IPAddressToString):$Port"
+        Write-Verbose "Sending UDP traffic to $($RemoteEndPoint.ToString())"
         Write-Verbose "Make sure to send some data to the server!"
 
         $Properties = @{
             UdpClient = $UdpClient
             Socket = $UdpClient.Client
-            RemoteEndPoint = $RemoteEndPoint
+            Read = $UdpClient.BeginReceive($null, $null)
         }
         $UdpStream = New-Object -TypeName psobject -Property $Properties
     }

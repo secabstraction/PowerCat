@@ -82,7 +82,7 @@
             if ((Test-Path $Input)) { $BytesToSend = [IO.File]::ReadAllBytes($Input) }     
             elseif ($Input.GetType() -eq [Byte[]]) { $BytesToSend = $Input }
             elseif ($Input.GetType() -eq [String]) { $BytesToSend = $EncodingType.GetBytes($Input) }
-            else { Write-Warning 'Incompatible input type.' ; exit }
+            else { Write-Warning 'Incompatible input type.' ; return }
         }
 
         elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
@@ -100,7 +100,7 @@
                     'smb' { $RelayStream = New-SmbStream -Listener $RelayConfig[1] ; continue }
                     'tcp' { $RelayStream = New-TcpStream -Listener $RelayConfig[1] ; continue }
                     'udp' { $RelayStream = New-UdpStream -Listener $RelayConfig[1] ; continue }
-                    default { Write-Warning 'Invalid relay mode specified.' ; exit }
+                    default { Write-Warning 'Invalid relay mode specified.' ; return }
                 }
             }
             elseif ($RelayConfig.Count -eq 3) { # Client
@@ -113,7 +113,7 @@
                     'smb' { $RelayStream = New-SmbStream $RelayConfig[1] $RelayConfig[2] ; continue }
                     'tcp' { $RelayStream = New-TcpStream $ServerIp $RelayConfig[2] ; continue }
                     'udp' { $RelayStream = New-UdpStream $ServerIp $RelayConfig[2] ; continue }
-                    default { Write-Warning 'Invalid relay mode specified.' ; exit }
+                    default { Write-Warning 'Invalid relay mode specified.' ; return }
                 }
             }
             else { Write-Error 'Invalid relay format.' -ErrorAction Stop }
@@ -141,53 +141,57 @@
         switch ($Mode) {
            'Icmp' { 
                 try { $InitialBytes, $ClientStream = New-IcmpStream $ServerIp $ParameterDictionary.BindAddress.Value }
-                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; exit }
+                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; return }
                 continue 
             }
             'Smb' { 
                 try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value  }
-                catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; exit }
+                catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
                 continue 
             }
             'Tcp' { 
-                try { $ClientStream = New-TcpStream $ServerIp $Port }
-                catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; exit }
+                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value }
+                catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
                 continue 
             }
             'Udp' { 
-                try { $InitialBytes, $ClientStream = New-UdpStream $ServerIp $Port }
-                catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; exit }
+                try { $InitialBytes, $ClientStream = New-UdpStream $ServerIp $ParameterDictionary.Port.Value }
+                catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; return }
             }
         }
       
-        if ($BytesToSend.Count) { Write-NetworkStream $Mode $ClientStream $BytesToSend }
-        
-        [console]::TreatControlCAsInput = $true
+        if ($BytesToSend.Count) { Write-NetworkStream $Mode $ClientStream $BytesToSend }        
     }
-    Process {           
+    Process {     
     
         if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
 
         while ($true) {
             
-            # Catch Ctrl+C / Read-Host
+            # Catch Esc / Read-Host
             if ([console]::KeyAvailable) {          
-                $Key = [console]::ReadKey($true)
-                if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
+                $Key = [console]::ReadKey()
+                if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning 'Caught escape sequence, stopping PowerCat.'
                     break
                 }
                 if ($PSCmdlet.ParameterSetName -eq 'Console') { 
-                    Write-Host -NoNewline $Key.KeyChar
                     $BytesToSend = $EncodingType.GetBytes($Key.KeyChar + (Read-Host) + "`n") 
                     Write-NetworkStream $Mode $ClientStream $BytesToSend
                 }
             }
 
             # Get data from the network
-            if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available }
-            elseif ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream }
-            else { continue }
+            if ($InitialBytes) { $ReceivedBytes = $InitialBytes ; $InitialBytes = $null }
+            elseif ($ClientStream.Socket.Connected) { 
+                if ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available } 
+                else { Start-Sleep -Milliseconds 1 ; continue }
+            }
+            elseif ($ClientStream.Pipe.IsConnected) { 
+                if ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream } 
+                else { Start-Sleep -Milliseconds 1 ; continue }
+            }
+            else { Write-Warning 'Connection broken, exiting.' ; break }
 
             # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {
@@ -219,12 +223,13 @@
             }
             else { # StdOut
                 if ($OutputType -eq 'Bytes') { Write-Output $ReceivedBytes }
-                else { Write-Output $EncodingType.GetString($ReceivedBytes) }
+                else { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
             }
         }
     }
     End {   
-        [console]::TreatControlCAsInput = $false
+
+        Write-Verbose 'Attempting to close network stream.'
       
         try { Close-NetworkStream $Mode $ClientStream }
         catch { Write-Warning "Failed to close client stream. $($_.Exception.Message)" }

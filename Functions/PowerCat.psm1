@@ -244,7 +244,7 @@ function New-UdpStream {
 
         Write-Verbose "Listening on 0.0.0.0:$Port [udp]"
                 
-        $ConnectHandle = $UdpClient.Client.BeginReceiveFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
+        $ConnectHandle = $UdpClient.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
         
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
         [console]::TreatControlCAsInput = $true
@@ -276,18 +276,19 @@ function New-UdpStream {
         $Stopwatch.Stop()
 
         $SocketFlags = 0
-        $SocketBytesRead = $UdpClient.Client.EndReceiveFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
+        $SocketBytesRead = $UdpClient.Client.EndReceiveMessageFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
                 
         if ($SocketBytesRead.Count) { $InitialBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
 
         Write-Verbose "Connection from $($RemoteEndPoint.Address.IPAddressToString):$($RemoteEndPoint.Port) [udp] accepted."
 
         $Properties = @{
+            InitialBytes = $InitialBytes
             UdpClient = $UdpClient
             Socket = $UdpClient.Client
-            RemoteEndPoint = $RemoteEndPoint
+            Read = $UdpClient.BeginReceive($null, $null)
         }
-        $UdpStream = New-Object -TypeName psobject -Property $Properties
+        New-Object -TypeName psobject -Property $Properties
     }        
     else { # Client
         $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @($ServerIp, $Port) 
@@ -298,13 +299,13 @@ function New-UdpStream {
         Write-Verbose "Make sure to send some data to the server!"
 
         $Properties = @{
+            InitialBytes = $InitialBytes
             UdpClient = $UdpClient
             Socket = $UdpClient.Client
-            RemoteEndPoint = $RemoteEndPoint
+            Read = $UdpClient.BeginReceive($null, $null)
         }
-        $UdpStream = New-Object -TypeName psobject -Property $Properties
+        New-Object -TypeName psobject -Property $Properties
     }
-    return $InitialBytes, $UdpStream
 }
 
 function New-IcmpStream {
@@ -467,7 +468,7 @@ function Write-NetworkStream {
             continue 
         }
         'Udp' { 
-            try { $BytesSent = $Stream.UdpClient.Send($Bytes, $Bytes.Length, $Stream.RemoteEndPoint) }
+            try { $BytesSent = $Stream.UdpClient.Send($Bytes, $Bytes.Length) }
             catch { Write-Warning "Failed to send Udp data to $($Stream.RemoteEndPoint.ToString()). $($_.Exception.Message)." }
         }
     }
@@ -527,8 +528,10 @@ function Read-NetworkStream {
             else { Write-Warning 'Tcp stream cannot be read.' ; continue }
         }
         'Udp' { 
-            try { $Bytes = $Stream.UdpClient.Receive([ref]$Stream.RemoteEndPoint) }
-            catch { Write-Warning "Failed to receive Udp data from $($Stream.RemoteEndPoint.ToString()). $($_.Exception.Message)." ; continue }
+            try { $Bytes = $Stream.UdpClient.EndReceive($Stream.Read, $Stream.Socket.RemoteEndpoint) }
+            catch { Write-Warning "Failed to receive Udp data from $($Stream.Socket.RemoteEndpoint.ToString()). $($_.Exception.Message)." ; continue }
+
+            $Stream.Read = $Stream.UdpClient.BeginReceive($null, $null)
 
             return $Bytes
         }
@@ -717,14 +720,9 @@ function Start-PowerCat {
             }
 
             # Get data from the network
-            if ($ServerStream.Socket.Connected) {
-                if ($ServerStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream $ServerStream.Socket.Available }
-                else { Start-Sleep -Milliseconds 1 ; continue }
-            }
-            elseif ($ServerStream.Pipe.IsConnected) { 
-                if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream }
-                else { Start-Sleep -Milliseconds 1 ; continue }
-            }
+            if ($ServerStream.InitialConnectionBytes) { $ReceivedBytes = $ServerStream.InitialConnectionBytes ; $ServerStream.InitialConnectionBytes = $null }
+            elseif ($ServerStream.Socket.Connected) { if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream $ServerStream.Socket.Available } }
+            elseif ($ServerStream.Pipe.IsConnected) { if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream } }
             else { Write-Warning 'Connection broken, exiting.' ; break }
 
             # Redirect received bytes
@@ -960,14 +958,9 @@ function Connect-PowerCat {
             }
 
             # Get data from the network
-            if ($ClientStream.Socket.Connected) {
-                if ($ClientStream.Socket.Available) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available }
-                else { Start-Sleep -Milliseconds 1 ; continue }
-            }
-            elseif ($ClientStream.Pipe.IsConnected) { 
-                if ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream }
-                else { Start-Sleep -Milliseconds 1 ; continue }
-            }
+            if ($ServerStream.InitialConnectionBytes) { $ReceivedBytes = $ServerStream.InitialConnectionBytes ; $ServerStream.InitialConnectionBytes = $null }
+            elseif ($ServerStream.Socket.Connected) { if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream $ServerStream.Socket.Available } }
+            elseif ($ServerStream.Pipe.IsConnected) { if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream } }
             else { Write-Warning 'Connection broken, exiting.' ; break }
 
             # Redirect received bytes

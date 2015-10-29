@@ -57,7 +57,7 @@
             $PipeServer.Dispose()
             return
         }
-        Write-Verbose "Connection from client successful!"
+        Write-Verbose "Connection from client accepted."
 
         $Buffer = New-Object Byte[] -ArgumentList $BufferSize
 
