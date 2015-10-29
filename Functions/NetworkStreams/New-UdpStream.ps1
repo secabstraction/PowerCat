@@ -34,7 +34,7 @@
         do {
             if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey($true)
-                if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
+                if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning "Caught escape sequence, stopping UDP Setup."
                     $UdpClient.Dispose()
                     $Stopwatch.Stop()

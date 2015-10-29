@@ -15,7 +15,7 @@
             continue 
         }
         'Smb' { 
-            try { $Stream.Pipe.Dispose()  }
+            try { $Stream.Pipe.Close() ; $Stream.Pipe.Dispose()  }
             catch { Write-Warning "Failed to dispose Smb stream. $($_.Exception.Message)." }
             
             continue 
