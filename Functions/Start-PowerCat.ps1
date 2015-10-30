@@ -91,37 +91,67 @@
              'UTF8' { $EncodingType = New-Object Text.UTF8Encoding ; continue }
             'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
         }
+
+        if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') {
+            if ($Mode -eq
+            $FileStream = New-Object IO.FileStream -ArgumentList @($ReceiveFile, [IO.FileMode]::Append)
+            if ($Mode -eq 'Smb') {
+                $ReceivedBytes = Read-NetworkStream $Mode $ServerStream
+                $FileSize = [int]($EncodingType.GetString($ReceivedBytes))
+            }
+        }
       
         if ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
             
             Write-Verbose 'Reading file bytes...'
 
             if ((Test-Path $SendFile)) { 
-                $FileSize = (Get-Item $SendFile).Length
-
-                $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open)
-                $BytesLeft = $FileStream.Length
-                $FileOffset = 0
-
-                if ($FileStream.Length -gt 65536) {
-                    $BytesToSend = New-Object Byte[] 65536
-                    do {
-                        [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                        [void]$FileStream.Read($BytesToSend, 0, $BytesToSend.Length)
-                        $FileOffset += $BytesToSend.Length
-                        $BytesLeft -= $BytesToSend.Length
-                        Write-NetworkStream $Mode $ServerStream $BytesToSend
-                    } while ($BytesLeft -gt $BytesToSend.Length)
-                    $BytesToSend = New-Object Byte[] $BytesLeft
-                    $FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                    $FileStream.Read($BytesToSend, 0, $BytesLeft)
-                    Write-NetworkStream $Mode $ServerStream $BytesToSend
-                }
-                else {
-                    try { $BytesToSend = [IO.File]::ReadAllBytes($SendFile) } 
+            
+                if ($Mode -eq 'Smb') { 
+                    try { $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open) }
                     catch { Write-Warning $_.Exception.Message }
-                    Write-NetworkStream $Mode $ServerStream $BytesToSend
+
+                    $BytesLeft = $FileStream.Length
+
+                    Write-NetworkStream $Mode $ServerStream ($EncodingType.GetBytes($BytesLeft.ToString()))
+
+                    if ($BytesLeft) {
+                    
+                        $FileOffset = 0
+                        if ($BytesLeft -gt 65536) {
+
+                            $BytesToSend = New-Object Byte[] 65536
+
+                            while ($BytesLeft -gt 65536) {
+
+                                [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                                [void]$FileStream.Read($BytesToSend, 0, 65536)
+                            
+                                $FileOffset += 65536
+                                $BytesLeft -= 65536
+
+                                Write-NetworkStream $Mode $ServerStream $BytesToSend
+                            } 
+
+                            $BytesToSend = New-Object Byte[] $BytesLeft
+                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                            [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+
+                            Write-NetworkStream $Mode $ServerStream $BytesToSend
+                        }
+                        else {
+                            $BytesToSend = New-Object Byte[] $BytesLeft
+                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                            [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+
+                            Write-NetworkStream $Mode $ServerStream $BytesToSend
+                        }
+                        $FileStream.Flush()
+                        $FileStream.Dispose()
+                    }
+                    $ServerStream.Pipe.WaitForPipeDrain() 
                 }
+                elseif ($Mode -eq 'Tcp') { $ServerStream.Socket.SendFile($SendFile, $null, $null, [Net.Sockets.TransmitFileOptions]::Disconnect) }
             }
             else { Write-Warning "$SendFile does not exist." }
         }
@@ -182,7 +212,7 @@
 
         while ($true) {
 
-            if ($PSCmdlet.ParameterSetName -eq 'SendFile') { Write-Verbose "$SendFile sent." ; break }
+            if ($PSCmdlet.ParameterSetName -eq 'SendFile') { break } # Skip to Cleanup
             if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
             
             # Catch Esc / Read-Host
@@ -228,12 +258,9 @@
             }
             elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream $RelayMode $RelayStream $ReceivedBytes ; continue }
             elseif ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { 
-                $FileStream = New-Object IO.FileStream -ArgumentList @($ReceiveFile, [IO.FileMode]::Append)
-                [void]$FileStream.Seek(0, [IO.SeekOrigin]::End) 
+                if ($Mode -eq 'Smb' -and $FileStream.Length -eq $FileSize) { break } # EOF
                 $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) 
-                $FileStream.Flush() 
-                $FileStream.Dispose() 
-                break
+                continue
             }
             else { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
         }
@@ -241,6 +268,8 @@
     End {   
         [console]::TreatControlCAsInput = $false
         Write-Verbose 'Attempting to close network stream.'
+
+        if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream.Flush() ; $FileStream.Dispose() }
       
         try { Close-NetworkStream $Mode $ServerStream }
         catch { Write-Warning "Failed to close client stream. $($_.Exception.Message)" }

@@ -28,12 +28,15 @@
             try { $BytesRead = $Stream.Pipe.EndRead($Stream.Read) }
             catch { Write-Warning "Failed to read Smb data. $($_.Exception.Message)." ; continue }
 
-            $BytesReceived = $Stream.Buffer[0..($BytesRead - 1)]
-            [Array]::Clear($Stream.Buffer, 0, $BytesRead)
-
+            if ($BytesRead) {
+                $BytesReceived = $Stream.Buffer[0..($BytesRead - 1)]    # Grab only bytes written to buffer
+                [Array]::Clear($Stream.Buffer, 0, $BytesRead)           # Clear buffer for next read
+            }
+            # Restart read operation
             $Stream.Read = $Stream.Pipe.BeginRead($Stream.Buffer, 0, $Stream.Buffer.Length, $null, $null)
-
-            return $BytesReceived
+            
+            if ($BytesRead) { return $BytesReceived }
+            else { Write-Verbose '0 bytes read from smb stream.' ; continue }
         }
         'Tcp' { 
             if ($Stream.TcpStream.CanRead) {

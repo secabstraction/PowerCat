@@ -10,25 +10,26 @@
     switch ($Mode) {
         'Icmp' { 
             try { $Stream.Socket.Dispose() }
-            catch { Write-Warning "Failed to dispose Icmp socket. $($_.Exception.Message)." }
-            
+            catch { Write-Warning "Failed to dispose Icmp socket. $($_.Exception.Message)." ; continue }
+            Write-Verbose 'Icmp socket closed.'
             continue 
         }
         'Smb' { 
-            try { $Stream.Pipe.Close() ; $Stream.Pipe.Dispose()  }
-            catch { Write-Warning "Failed to dispose Smb stream. $($_.Exception.Message)." }
-            
+            try { $Stream.Pipe.Dispose() }
+            catch { Write-Warning "Failed to dispose Smb stream. $($_.Exception.Message)." ; continue }
+            Write-Verbose 'Smb connection closed.'
             continue 
         }
         'Tcp' { 
-            try { $Stream.Socket.Dispose() }
-            catch { Write-Warning "Failed to dispose Tcp socket. $($_.Exception.Message)." }
-            
+            try { $Stream.Socket.Dispose() ; $Stream.TcpStream.Dispose() }
+            catch { Write-Warning "Failed to dispose Tcp socket. $($_.Exception.Message)." ; continue }
+            Write-Verbose 'Tcp connection closed.'
             continue 
         }
         'Udp' { 
-            try { $Stream.Socket.Dispose() }
-            catch { Write-Warning "Failed to dispose Udp socket. $($_.Exception.Message)." }
+            try { $Stream.Socket.Dispose() ; $Stream.UdpClient.Dispose() }
+            catch { Write-Warning "Failed to dispose Udp socket. $($_.Exception.Message)." ; continue }
+            Write-Verbose 'Udp connection closed.'
         }
     }
 }
