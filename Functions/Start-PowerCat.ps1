@@ -1,10 +1,10 @@
 ﻿function Start-PowerCat {
 [CmdletBinding(DefaultParameterSetName = 'Console')]
     Param (
-        [Parameter(Position = 0, Mandatory = $true)]
+        [Parameter(Position = 0)]
         [Alias('m')]
         [ValidateSet('Smb', 'Tcp', 'Udp')]
-        [String]$Mode,
+        [String]$Mode = 'Tcp',
         
         [Parameter(ParameterSetName = 'Execute')]
         [Alias('e')]
@@ -41,11 +41,8 @@
     DynamicParam {
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
-        switch ($Mode) {
-            'Smb' { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary ; continue }
-            'Tcp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary ; continue }
-            'Udp' { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary ; continue }
-        }
+        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
+        else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
 
         if ($Execute.IsPresent) { 
             $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 

