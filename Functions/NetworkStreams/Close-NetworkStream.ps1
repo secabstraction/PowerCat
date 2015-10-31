@@ -8,12 +8,6 @@
         [Object]$Stream
     )    
     switch ($Mode) {
-        'Icmp' { 
-            try { $Stream.Socket.Dispose() }
-            catch { Write-Warning "Failed to dispose Icmp socket. $($_.Exception.Message)." ; continue }
-            Write-Verbose 'Icmp socket closed.'
-            continue 
-        }
         'Smb' { 
             try { $Stream.Pipe.Dispose() }
             catch { Write-Warning "Failed to dispose Smb stream. $($_.Exception.Message)." ; continue }

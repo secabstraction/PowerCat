@@ -11,18 +11,6 @@
         [Int]$Size
     )    
     switch ($Mode) {
-        'Icmp' { 
-            $Buffer = New-Object Byte[] -ArgumentList $Size
-
-            try { $BytesReceived = $Stream.Socket.ReceiveFrom($Buffer, $Stream.RemoteEndPoint) }
-            catch { 
-                Write-Warning "Failed to receive Icmp data from $($Stream.RemoteEndPoint.ToString()). $($_.Exception.Message)." 
-                Remove-Variable Buffer 
-                continue
-            }
-            
-            return $Buffer[0..($BytesReceived - 1)] 
-        }
         'Smb' { 
             
             try { $BytesRead = $Stream.Pipe.EndRead($Stream.Read) }
@@ -44,19 +32,22 @@
                 try { $BytesRead = $Stream.TcpStream.EndRead($Stream.Read) }
                 catch { Write-Warning "Failed to read Tcp stream. $($_.Exception.Message)." ; continue }
                 
-                $BytesReceived = $Stream.Buffer[0..($BytesRead - 1)]
-                [Array]::Clear($Stream.Buffer, 0, $BytesRead)
-                
+                if ($BytesRead) {
+                    $BytesReceived = $Stream.Buffer[0..($BytesRead - 1)]    # Grab only bytes written to buffer
+                    [Array]::Clear($Stream.Buffer, 0, $BytesRead)           # Clear buffer for next read
+                }
                 $Stream.Read = $Stream.TcpStream.BeginRead($Stream.Buffer, 0, $Stream.Buffer.Length, $null, $null)
                 
-                return $BytesReceived
+                if ($BytesRead) { return $BytesReceived }
+                else { Write-Verbose '0 bytes read from tcp stream.' ; continue }
             }
             else { Write-Warning 'Tcp stream cannot be read.' ; continue }
         }
         'Udp' { 
             try { $Bytes = $Stream.UdpClient.EndReceive($Stream.Read, [ref]$Stream.Socket.RemoteEndpoint) }
             catch { Write-Warning "Failed to receive Udp data from $($Stream.Socket.RemoteEndpoint.ToString()). $($_.Exception.Message)." ; continue }
-
+            
+            # Restart read operation
             $Stream.Read = $Stream.UdpClient.BeginReceive($null, $null)
 
             return $Bytes
