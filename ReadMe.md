@@ -4,7 +4,7 @@ PowerCat
 Write-Warning 'PowerCat is under construction. Check back soon for updates.'
 Write-Warning 'I will remove this warning when the code is functional.'
 ```
-A PowerShell TCP/IP swiss army knife. 
+A PowerShell TCP/IP swiss army knife that's interoperable with the original netcat.
 
 Installation
 ------------
