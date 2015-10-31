@@ -8,14 +8,11 @@ A PowerShell TCP/IP swiss army knife.
 
 Installation
 ------------
-PowerCat is a PowerShell module.  First you need to import the module before you can use the PowerCat functions.  You can put one of the below commands into your PowerShell profile so PowerCat is automatically loaded when PowerShell starts.
+PowerCat is packaged as a PowerShell module.  First you need to import the module before you can use its functions.
 ###
 ```powershell
     # Import the functions from downloaded psm1/psd1 File:
-    Import-Module PowerCat.psm1
-    # Load the functions individually from URL:
-    Invoke-Expression (New-Object Net.Webclient).DownloadString('https://raw.githubusercontent.com/secabstraction/PowerCat/master/Invoke-PowerCat.ps1')
-    Invoke-Expression (New-Object Net.Webclient).DownloadString('https://raw.githubusercontent.com/secabstraction/PowerCat/master/Invoke-DnsCat.ps1')
+    Import-Module PowerCat.psd1
 ```
 ### Parameters:
 ```powershell    
