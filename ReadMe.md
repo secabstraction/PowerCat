@@ -11,7 +11,7 @@ Installation
 PowerCat is packaged as a PowerShell module.  First you need to import the module before you can use its functions.
 ###
 ```powershell
-    # Import the functions from downloaded psm1/psd1 File:
+    # Import the functions from downloaded psd1 File:
     Import-Module PowerCat.psd1
 ```
 ### Parameters:

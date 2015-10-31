@@ -39,7 +39,7 @@
                     return
                 }
             }
-            if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
+            if ($Stopwatch.Elapsed.TotalMilliseconds -gt $Timeout) {
                 Write-Warning 'Timeout exceeded, stopping TCP setup.'
                 [console]::TreatControlCAsInput = $false
                 $TcpListener.Stop()

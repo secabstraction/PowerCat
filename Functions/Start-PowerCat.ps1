@@ -56,20 +56,20 @@
 
         switch ($Mode) {
             'Smb' { 
-                try { $ServerStream = New-SmbStream -Listener $ParameterDictionary.PipeName.Value  }
+                try { $ServerStream = New-SmbStream -Listener $ParameterDictionary.PipeName.Value -TimeOut $Timeout }
                 catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
                 continue 
             }
             'Tcp' { 
                 if ((Test-Port -Number $ParameterDictionary.Port.Value -Transport Tcp)) {
-                    try { $ServerStream = New-TcpStream -Listener $ParameterDictionary.Port.Value }
+                    try { $ServerStream = New-TcpStream -Listener $ParameterDictionary.Port.Value -TimeOut $Timeout }
                     catch { Write-Warning "$($_.Exception.Message)" }
                 }
                 continue 
             }
             'Udp' { 
                 if ((Test-Port -Number $ParameterDictionary.Port.Value -Transport Udp)) {
-                    try { $InitialBytes, $ServerStream = New-UdpStream -Listener $ParameterDictionary.Port.Value }
+                    try { $InitialBytes, $ServerStream = New-UdpStream -Listener $ParameterDictionary.Port.Value -TimeOut $Timeout }
                     catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; return }
                 }
             }
@@ -240,7 +240,10 @@
                 catch { Write-Verbose $_.Exception.Message ; break } # EOF reached
                 continue
             }
-            else { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
+            else { 
+                try { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
+                catch { Write-Verbose $_.Exception.Message ; break }
+            }
         }
     }
     End {   
