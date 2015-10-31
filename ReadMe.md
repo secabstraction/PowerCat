@@ -50,7 +50,7 @@ PowerCat is a PowerShell module.  First you need to import the module before you
 ```
 Basic Connections
 -----------------------------------
-By default, PowerCat reads input from the console and writes input to the console using write-host. You can change the output type to 'Bytes', or 'String' with the -OutputType.
+By default, PowerCat uses TCP and reads/writes from/to the console.
 ###
 ```powershell
     # Basic Listener:
@@ -106,8 +106,8 @@ Relays in PowerCat are similar to netcat relays, but you don't have to create a 
     # TCP Client to Client Relay
     Connect-PowerCat -RemoteIp 10.1.1.1 -Port 9000 -Relay tcp:10.1.1.16:443
         
-    # TCP Listener to Listener Relay
-    New-PowerCat -Listener -Port 8000 -Relay tcp:9000
+    # TCP Listener to SMB Listener Relay
+    New-PowerCat -Listener -Port 8000 -Relay smb:PowerCat
 ```
 Generate Payloads
 -----------------
