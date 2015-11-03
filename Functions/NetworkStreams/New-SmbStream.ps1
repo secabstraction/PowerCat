@@ -39,7 +39,7 @@
                 }
             }
 
-            if ($Stopwatch.Elapsed.TotalMilliseconds -gt $Timeout) {
+            if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning "Timeout exceeded, stopping UDP Setup."
                 [console]::TreatControlCAsInput = $false
                 $PipeServer.Dispose()

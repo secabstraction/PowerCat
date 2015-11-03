@@ -44,7 +44,7 @@
                 }
             }
 
-            if ($Stopwatch.Elapsed.TotalMilliseconds -gt $Timeout) {
+            if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning "Timeout exceeded, stopping UDP Setup."
                 $UdpClient.Dispose()
                 $Stopwatch.Stop()

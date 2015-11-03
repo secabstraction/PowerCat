@@ -231,7 +231,8 @@
             # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {
             
-                $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes))
+                try { $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes)) }
+                catch { Write-Verbose $_.Exception.Message ; break } # network stream closed
             
                 $Global:Error.Clear()
                 

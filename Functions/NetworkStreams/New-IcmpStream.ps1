@@ -11,7 +11,7 @@
         [String]$BindAddress,
         
         [Parameter()]
-        [Int]$BufferSize = 65536,
+        [Int]$BufferSize = 4608,
         
         [Parameter()]
         [Int]$Timeout = 60
@@ -21,16 +21,14 @@
     $SocketLocalEndPoint = New-Object Net.IPEndPoint @(([Net.IPAddress]::Parse($BindAddress)), $null)
     $IcmpSocket.Bind($SocketLocalEndPoint)
     $IcmpSocket.IOControl([Net.Sockets.IOControlCode]::ReceiveAll, [byte[]]@(1, 0, 0, 0), [byte[]]@(1, 0, 0, 0))
-    $SocketDestinationBuffer = New-Object Byte[] 65536
+    $SocketDestinationBuffer = New-Object Byte[] 4608
     
     Write-Verbose "Listening on $($IcmpSocket.LocalEndPoint.Address.IPAddressToString) [icmp]"
 
     if ($Listener.IsPresent) {
         
-        $RemoteEndPoint = New-Object Net.IPEndPoint @([Net.IPAddress]::Any, $null)
-        $PacketInfo = New-Object Net.Sockets.IPPacketInformation
-                
-        $ConnectResult = $IcmpSocket.BeginReceiveFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
+        $RemoteEndPoint = New-Object Net.IPEndPoint @([Net.IPAddress]::Any, $null)                
+        $ConnectResult = $IcmpSocket.BeginReceiveFrom($SocketDestinationBuffer, 0, 4608, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
         
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
         [console]::TreatControlCAsInput = $true
@@ -38,8 +36,8 @@
         do {
             if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey($true)
-                if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
-                    Write-Warning 'Caught escape sequence, stopping UDP Setup.'
+                if ($Key.Key -eq [Consolekey]::Escape) {
+                    Write-Warning 'Caught escape sequence, stopping Icmp setup.'
                     [console]::TreatControlCAsInput = $false
                     $SocketDestinationBuffer = $null
                     $IcmpSocket.Dispose()
@@ -49,7 +47,7 @@
             }
 
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
-                Write-Warning "Timeout exceeded, stopping UDP Setup."
+                Write-Warning "Timeout exceeded, stopping Icmp setup."
                 [console]::TreatControlCAsInput = $false
                 $SocketDestinationBuffer = $null
                 $IcmpSocket.Dispose()
@@ -62,8 +60,7 @@
         $Stopwatch.Stop()
 
         $SocketFlags = 0
-        $SocketBytesRead = $IcmpSocket.EndReceiveFrom($ConnectResult, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
-        $IcmpSocket.Connect($RemoteEndPoint)
+        $SocketBytesRead = $IcmpSocket.EndReceiveFrom($ConnectResult, [ref]$RemoteEndPoint)
 
         Write-Verbose "Connection from $($RemoteEndPoint.ToString()) [icmp] accepted."
                 
@@ -75,7 +72,7 @@
         $Properties = @{
             Socket = $IcmpSocket
             Buffer = $SocketDestinationBuffer
-            Read = $IcmpSocket.BeginReceive($SocketDestinationBuffer, 0, 65536, 0, $null, $null)
+            Read = $IcmpSocket.BeginReceive($SocketDestinationBuffer, 0, 4608, 0, $null, $null)
         }
         $IcmpStream = New-Object -TypeName psobject -Property $Properties
     }        
@@ -89,7 +86,7 @@
         $Properties = @{
             Socket = $IcmpSocket
             Buffer = $SocketDestinationBuffer
-            Read = $IcmpSocket.BeginReceive($SocketDestinationBuffer, 0, 65536, 0, $null, $null)
+            Read = $IcmpSocket.BeginReceive($SocketDestinationBuffer, 0, 4608, 0, $null, $null)
         }
         $IcmpStream = New-Object -TypeName psobject -Property $Properties
     }

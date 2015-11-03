@@ -39,6 +39,7 @@
         [String]$Encoding = 'Ascii'
     )       
     DynamicParam {
+        $Ipv4 = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
         if ($Mode -eq 'Icmp') { $BindParam = New-RuntimeParameter -Name BindAddress -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary -ValidatePattern $Ipv4 }
@@ -56,7 +57,7 @@
 
         switch ($Mode) {
             'Icmp' { 
-                try { $InitialBytes, $ServerStreamServerStream = New-IcmpStream -Listener $ParameterDictionary.BindAddress.Value -TimeOut $Timeout }
+                try { $InitialBytes, $ServerStream = New-IcmpStream -Listener $ParameterDictionary.BindAddress.Value -TimeOut $Timeout }
                 catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; return }
                 continue 
             }
@@ -228,7 +229,8 @@
             # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {
             
-                $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes))
+                try { $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes)) }
+                catch { Write-Verbose $_.Exception.Message ; break } # network stream closed
             
                 $Global:Error.Clear()
 
