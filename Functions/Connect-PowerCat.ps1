@@ -3,12 +3,11 @@
     Param (
         [Parameter(Position = 0)]
         [Alias('m')]
-        [ValidateSet('Smb', 'Tcp', 'Udp')]
+        [ValidateSet('Icmp', 'Smb', 'Tcp', 'Udp')]
         [String]$Mode = 'Tcp',
 
         [Parameter(Position = 1, Mandatory = $true)]
         [ValidatePattern("^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")]
-        [Alias('c')]
         [String]$RemoteIp,
         
         [Parameter(ParameterSetName = 'Execute')]
@@ -42,18 +41,19 @@
         [Parameter()]
         [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
         [String]$Encoding = 'Ascii'
-    )       
-    DynamicParam {
+    ) 
+    DynamicParam {      
+        $Ipv4 = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
-        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
+        if ($Mode -eq 'Icmp') { $BindParam = New-RuntimeParameter -Name BindAddress -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary -ValidatePattern $Ipv4 }
+        elseif ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
         else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
 
         if ($Execute.IsPresent) { 
             $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
-
         return $ParameterDictionary
     }
     Begin {     
@@ -62,6 +62,11 @@
         $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
 
         switch ($Mode) {
+            'Icmp' { 
+                try { $InitialBytes, $ClientStream = New-IcmpStream $ServerIp $ParameterDictionary.BindAddress.Value -TimeOut $Timeout }
+                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; return }
+                continue 
+            }
             'Smb' { 
                 try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value -TimeOut $Timeout  }
                 catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
@@ -90,18 +95,20 @@
       
         if ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
             
-            Write-Verbose 'Reading file bytes...'
+            Write-Verbose 'Attempting to send file...'
 
             if ((Test-Path $SendFile)) { 
             
-                if ($Mode -eq 'Smb' -or $Mode -eq 'Udp') { 
+                if ($Mode -eq 'Tcp') { $ClientStream.Socket.SendFile($SendFile) ; sleep 1 } 
+                    
+                else {
                     try { $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open) }
                     catch { Write-Warning $_.Exception.Message }
 
-                    if ($BytesLeft = $FileStream.Length) {
+                    if ($BytesLeft = $FileStream.Length) { # If no filestream goto End
                     
                         $FileOffset = 0
-                        if ($BytesLeft -gt 4608) {
+                        if ($BytesLeft -gt 4608) { # Max Udp packet size for Ncat
 
                             $BytesToSend = New-Object Byte[] 4608
 
@@ -115,14 +122,14 @@
 
                                 Write-NetworkStream $Mode $ClientStream $BytesToSend
                             } 
-
+                            # Send last packet
                             $BytesToSend = New-Object Byte[] $BytesLeft
                             [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
                             [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
 
                             Write-NetworkStream $Mode $ClientStream $BytesToSend
                         }
-                        else {
+                        else { # Only need to send one packet
                             $BytesToSend = New-Object Byte[] $BytesLeft
                             [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
                             [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
@@ -132,9 +139,8 @@
                         $FileStream.Flush()
                         $FileStream.Dispose()
                     }
-                    if ($Mode -eq 'Smb') { $ServerStream.Pipe.WaitForPipeDrain() } 
+                    if ($Mode -eq 'Smb') { $ClientStream.Pipe.WaitForPipeDrain() } 
                 }
-                else { $ClientStream.Socket.SendFile($SendFile) ; sleep 1 }
             }
             else { Write-Warning "$SendFile does not exist." }
         }
@@ -150,6 +156,7 @@
                 $RelayMode = $RelayConfig[0].ToLower()
 
                 switch ($RelayMode) {
+                   'icmp' { $RelayStream = New-IcmpStream -Listener $RelayConfig[1] ; continue }
                     'smb' { $RelayStream = New-SmbStream -Listener $RelayConfig[1] ; continue }
                     'tcp' { $RelayStream = New-TcpStream -Listener $RelayConfig[1] ; continue }
                     'udp' { $RelayStream = New-UdpStream -Listener $RelayConfig[1] ; continue }
@@ -159,16 +166,20 @@
             elseif ($RelayConfig.Count -eq 3) { # Client
                 
                 $RelayMode = $RelayConfig[0].ToLower()
-                $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
+                if ($RelayConfig[1] -match $Ipv4) {
+                    $ServerIp = [Net.IPAddress]::Parse($RelayConfig[1])
 
-                switch ($RelayMode) {
-                    'smb' { $RelayStream = New-SmbStream $RelayConfig[1] $RelayConfig[2] ; continue }
-                    'tcp' { $RelayStream = New-TcpStream $ServerIp $RelayConfig[2] ; continue }
-                    'udp' { $RelayStream = New-UdpStream $ServerIp $RelayConfig[2] ; continue }
-                    default { Write-Warning 'Invalid relay mode specified.' ; return }
+                    switch ($RelayMode) {
+                       'icmp' { $RelayStream = New-IcmpStream $ServerIp $RelayConfig[2] ; continue }
+                        'smb' { $RelayStream = New-SmbStream $RelayConfig[1] $RelayConfig[2] ; continue }
+                        'tcp' { $RelayStream = New-TcpStream $ServerIp $RelayConfig[2] ; continue }
+                        'udp' { $RelayStream = New-UdpStream $ServerIp $RelayConfig[2] ; continue }
+                        default { Write-Warning 'Invalid relay mode specified.' ; return }
+                    }
                 }
+                else { Write-Warning "$($RelayConfig[1]) is not a valid IPv4 address." }
             }
-            else { Write-Error 'Invalid relay format.' -ErrorAction Stop }
+            else { Write-Warning 'Invalid relay format.' }
         }
           
         elseif ($ParameterDictionary.ScriptBlock.Value) {
@@ -177,10 +188,10 @@
 
             $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
             
-            $Error.Clear()
+            $Global:Error.Clear()
             
             $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
-            if ($Error) { foreach ($Err in $Error) { $BytesToSend += $EncodingType.GetBytes($Err.ToString()) } }
+            if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
             $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
             
             Write-NetworkStream $Mode $ClientStream $BytesToSend
@@ -193,7 +204,7 @@
 
         while ($true) {
         
-            if ($PSCmdlet.ParameterSetName -eq 'SendFile') { Write-Verbose "$SendFile sent." ; break }
+            if ($PSCmdlet.ParameterSetName -eq 'SendFile') { break } # Skip to Cleanup
             if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break }
             
             # Catch Esc / Read-Host
@@ -211,15 +222,11 @@
 
             # Get data from the network
             if ($InitialBytes) { $ReceivedBytes = $InitialBytes ; $InitialBytes = $null }
-            elseif ($ClientStream.Socket.Connected) { 
-                if ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream $ClientStream.Socket.Available } 
-                else { Start-Sleep -Milliseconds 1 ; continue }
-            }
-            elseif ($ClientStream.Pipe.IsConnected) { 
+            elseif ($ClientStream.Socket.Connected -or $ClientStream.Pipe.IsConnected) { 
                 if ($ClientStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ClientStream } 
                 else { Start-Sleep -Milliseconds 1 ; continue }
             }
-            else { Write-Warning 'Connection broken, exiting.' ; break }
+            else { Write-Warning "$Mode connection broken, exiting." ; break }
 
             # Redirect received bytes
             if ($PSCmdlet.ParameterSetName -eq 'Execute') {
@@ -243,7 +250,7 @@
                 catch { Write-Verbose $_.Exception.Message ; break } # EOF reached
                 continue
             }
-            else { 
+            else { # Console
                 try { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
                 catch { Write-Verbose $_.Exception.Message ; break }
             }
