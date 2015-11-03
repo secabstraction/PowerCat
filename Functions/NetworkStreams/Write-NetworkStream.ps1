@@ -11,6 +11,11 @@
         [Byte[]]$Bytes
     )    
     switch ($Mode) {
+        'Icmp' { 
+            try { $BytesSent = $Stream.Socket.Send($Bytes) }
+            catch { Write-Warning "Failed to send Icmp data to $($Stream.Socket.RemoteEndPoint.ToString()). $($_.Exception.Message)" }
+            continue 
+        }
         'Smb' { 
             try { $Stream.Pipe.Write($Bytes, 0, $Bytes.Length) }
             catch { Write-Warning "Failed to send Smb data. $($_.Exception.Message)" ; return }

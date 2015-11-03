@@ -5,12 +5,23 @@
         [String]$Mode,
     
         [Parameter(Position = 1, Mandatory = $true)]
-        [Object]$Stream,
-    
-        [Parameter(Position = 2)]
-        [Int]$Size
+        [Object]$Stream
     )    
     switch ($Mode) {
+        'Icmp' { 
+
+            try { $BytesRead = $Stream.Socket.EndReceive($Stream.Read) }
+            catch { Write-Warning "Failed to receive Icmp data from $($Stream.RemoteEndPoint.ToString()). $($_.Exception.Message)." ; continue }
+
+            if ($BytesRead) {
+                $BytesReceived = $Stream.Buffer[0..($BytesRead - 1)]    # Grab only bytes written to buffer
+                [Array]::Clear($Stream.Buffer, 0, $BytesRead)           # Clear buffer for next read
+            }
+            $Stream.Read = $Stream.Socket.BeginReceive($Stream.Buffer, 0, 65536, 0, $null, $null)
+            
+            if ($BytesRead) { return $BytesReceived }
+            else { Write-Verbose '0 bytes read from smb stream.' ; continue }
+        }
         'Smb' { 
             
             try { $BytesRead = $Stream.Pipe.EndRead($Stream.Read) }
