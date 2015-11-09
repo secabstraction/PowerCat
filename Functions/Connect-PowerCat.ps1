@@ -3,7 +3,7 @@
     Param (
         [Parameter(Position = 0)]
         [Alias('m')]
-        [ValidateSet('Icmp', 'Smb', 'Tcp', 'Udp')]
+        [ValidateSet('Smb', 'Tcp', 'Udp')]
         [String]$Mode = 'Tcp',
 
         [Parameter(Position = 1, Mandatory = $true)]
@@ -42,15 +42,17 @@
         [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
         [String]$Encoding = 'Ascii'
     ) 
-    DynamicParam {      
-        $Ipv4 = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+    DynamicParam { 
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
-        
-        if ($Mode -eq 'Icmp') { $BindParam = New-RuntimeParameter -Name BindAddress -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary -ValidatePattern $Ipv4 }
-        elseif ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
-        else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
 
-        if ($Execute.IsPresent) { 
+        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
+        else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+        
+        if ($Execute.IsPresent -and $Mode -eq 'Udp') { 
+            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -Mandatory -ParameterDictionary $ParameterDictionary 
+            $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
+        }
+        elseif ($Execute.IsPresent) { 
             $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
@@ -62,11 +64,6 @@
         $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
 
         switch ($Mode) {
-            'Icmp' { 
-                try { $InitialBytes, $ClientStream = New-IcmpStream $ServerIp $ParameterDictionary.BindAddress.Value -TimeOut $Timeout }
-                catch { Write-Warning "Failed to open Icmp stream. $($_.Exception.Message)" ; return }
-                continue 
-            }
             'Smb' { 
                 try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value -TimeOut $Timeout  }
                 catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
@@ -150,27 +147,20 @@
             Write-Verbose "Setting up relay stream..."
 
             $RelayConfig = $Relay.Split(':')
+            $RelayMode = $RelayConfig[0].ToLower()
 
             if ($RelayConfig.Count -eq 2) { # Listener
-                
-                $RelayMode = $RelayConfig[0].ToLower()
-
                 switch ($RelayMode) {
-                   'icmp' { $RelayStream = New-IcmpStream -Listener $RelayConfig[1] ; continue }
                     'smb' { $RelayStream = New-SmbStream -Listener $RelayConfig[1] ; continue }
                     'tcp' { $RelayStream = New-TcpStream -Listener $RelayConfig[1] ; continue }
                     'udp' { $RelayStream = New-UdpStream -Listener $RelayConfig[1] ; continue }
                     default { Write-Warning 'Invalid relay mode specified.' ; return }
                 }
             }
-            elseif ($RelayConfig.Count -eq 3) { # Client
-                
-                $RelayMode = $RelayConfig[0].ToLower()
-                if ($RelayConfig[1] -match $Ipv4) {
+            elseif ($RelayConfig.Count -eq 3) { # Client                
+                if ($RelayConfig[1] -match "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$") {
                     $ServerIp = [Net.IPAddress]::Parse($RelayConfig[1])
-
                     switch ($RelayMode) {
-                       'icmp' { $RelayStream = New-IcmpStream $ServerIp $RelayConfig[2] ; continue }
                         'smb' { $RelayStream = New-SmbStream $RelayConfig[1] $RelayConfig[2] ; continue }
                         'tcp' { $RelayStream = New-TcpStream $ServerIp $RelayConfig[2] ; continue }
                         'udp' { $RelayStream = New-UdpStream $ServerIp $RelayConfig[2] ; continue }

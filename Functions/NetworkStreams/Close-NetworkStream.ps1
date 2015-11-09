@@ -1,18 +1,13 @@
 ﻿function Close-NetworkStream {
     Param (
         [Parameter(Position = 0, Mandatory = $true)]
-        [ValidateSet('Icmp', 'Smb', 'Tcp', 'Udp')]
+        [ValidateSet('Smb', 'Tcp', 'Udp')]
         [String]$Mode,
     
         [Parameter(Position = 1, Mandatory = $true)]
         [Object]$Stream
     )    
     switch ($Mode) {
-        'Icmp' { 
-            try { $Stream.Socket.Dispose() }
-            catch { Write-Warning "Failed to dispose Icmp socket. $($_.Exception.Message)." ; continue }
-            Write-Verbose 'Icmp connection closed.'
-        }
         'Smb' { 
             try { $Stream.Pipe.Dispose() }
             catch { Write-Warning "Failed to dispose Smb stream. $($_.Exception.Message)." ; continue }
