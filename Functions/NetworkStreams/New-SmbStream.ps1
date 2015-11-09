@@ -40,7 +40,7 @@
             }
 
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
-                Write-Warning "Timeout exceeded, stopping UDP Setup."
+                Write-Warning "Timeout exceeded, stopping Smb Setup."
                 [console]::TreatControlCAsInput = $false
                 $PipeServer.Dispose()
                 $Stopwatch.Stop()
@@ -59,7 +59,7 @@
         }
         Write-Verbose "Connection from client accepted."
 
-        $Buffer = New-Object Byte[] -ArgumentList $BufferSize
+        $Buffer = New-Object Byte[] $BufferSize
 
         $Properties = @{
             Pipe = $PipeServer
@@ -79,7 +79,7 @@
         }
         Write-Verbose "Connection to server successful!"
 
-        $Buffer = New-Object Byte[] -ArgumentList $BufferSize
+        $Buffer = New-Object Byte[] $BufferSize
 
         $Properties = @{
             Pipe = $PipeClient
