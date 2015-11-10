@@ -77,8 +77,7 @@
         $UdpClient = New-Object Net.Sockets.UDPClient
         $UdpClient.Connect($RemoteEndPoint)
 
-        Write-Verbose "Sending UDP traffic to $($RemoteEndPoint.ToString())"
-        Write-Verbose "Make sure to send some data to the server!"
+        Write-Verbose "Sending UDP to $($RemoteEndPoint.ToString()). Make sure to send some data to the server!"
 
         $Properties = @{
             UdpClient = $UdpClient

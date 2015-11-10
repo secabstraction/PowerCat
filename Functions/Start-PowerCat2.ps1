@@ -27,6 +27,10 @@
         [Switch]$Disconnect,
     
         [Parameter()]
+        [Alias('k')]
+        [Switch]$KeepAlive,
+    
+        [Parameter()]
         [Alias('t')]
         [Int]$Timeout = 60,
         
@@ -43,13 +47,14 @@
         if ($Execute.IsPresent) { 
             $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
-            $KeepAliveParam = New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary
         }
         return $ParameterDictionary
     }
     Begin {}
     Process {   
         while ($true) {
+            Write-Verbose "Setting up network stream..."
+
             switch ($Mode) {
                 'Smb' { 
                     try { $ServerStream = New-SmbStream -Listener $ParameterDictionary.PipeName.Value -TimeOut $Timeout }
@@ -82,7 +87,7 @@
       
             if ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
             
-                Write-Verbose "Attempting to send $SendFile"
+                Write-Verbose 'Attempting to send file...'
 
                 if ((Test-Path $SendFile)) { 
             
@@ -92,10 +97,10 @@
                         try { $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open) }
                         catch { Write-Warning $_.Exception.Message }
 
-                        if ($BytesLeft = $FileStream.Length) { # goto Cleanup
+                        if ($BytesLeft = $FileStream.Length) { # If no filestream goto End
                     
                             $FileOffset = 0
-                            if ($BytesLeft -gt 4608) { # Max packet size for Ncat
+                            if ($BytesLeft -gt 4608) { # Max Udp packet size for Ncat
 
                                 $BytesToSend = New-Object Byte[] 4608
 
@@ -162,20 +167,18 @@
                 else { Write-Warning 'Invalid relay format.' }
             }
           
-            elseif ($PSCmdlet.ParameterSetName -eq 'Execute') {
-                
-                $BytesToSend = $EncodingType.GetBytes("`nPowerCat by @secabstraction`n")
+            elseif ($ParameterDictionary.ScriptBlock.Value) {
             
-                if ($ParameterDictionary.ScriptBlock.Value) {
+                Write-Verbose 'Executing scriptblock...'
 
-                    $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
+                $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
             
-                    $Global:Error.Clear()
+                $Global:Error.Clear()
             
-                    $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
-                    if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
-                }
+                $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
+                if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
                 $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+            
                 Write-NetworkStream $Mode $ServerStream $BytesToSend
                 $ScriptBlock = $null
                 $BytesToSend = $null
@@ -184,8 +187,8 @@
             [console]::TreatControlCAsInput = $true
 
             while ($true) {
-                if ($PSCmdlet.ParameterSetName -eq 'SendFile') { break }
-                if ($Disconnect.IsPresent) { break } # goto Cleanup
+                if ($PSCmdlet.ParameterSetName -eq 'SendFile') { break } # Skip to Cleanup
+                if ($Disconnect.IsPresent) { Write-Verbose 'Disconnect specified, exiting.' ; break } # Skip to Cleanup
             
                 # Catch Esc / Read-Host
                 if ([console]::KeyAvailable) {          
@@ -212,7 +215,7 @@
                 if ($PSCmdlet.ParameterSetName -eq 'Execute') {
             
                     try { $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes)) }
-                    catch { break } # network stream closed
+                    catch { Write-Verbose $_.Exception.Message ; break } # network stream closed
             
                     $Global:Error.Clear()
 
@@ -228,17 +231,18 @@
                 elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream $RelayMode $RelayStream $ReceivedBytes ; continue }
                 elseif ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { 
                     try { $FileStream.Write($ReceivedBytes, 0, $ReceivedBytes.Length) }
-                    catch { break } # EOF reached
+                    catch { Write-Verbose $_.Exception.Message ; break } # EOF reached
                     continue
                 }
                 else { # Console
                     try { Write-Host -NoNewline $EncodingType.GetString($ReceivedBytes).TrimEnd("`r") }
-                    catch { break } # network stream closed
+                    catch { Write-Verbose $_.Exception.Message ; break }
                 }
             }
 
             # Cleanup
             [console]::TreatControlCAsInput = $false
+            Write-Verbose 'Attempting to close network stream.'
 
             if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream.Flush() ; $FileStream.Dispose() }
       
@@ -249,7 +253,7 @@
                 try { Close-NetworkStream $RelayMode $RelayStream }
                 catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
             }           
-            if (!$ParameterDictionary.KeepAlive.IsSet) { break }
+            if (!$KeepAlive.IsPresent) { break }
         }
     }
     End {}

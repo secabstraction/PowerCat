@@ -76,8 +76,6 @@
     else { # Client
 
         $TcpClient = New-Object Net.Sockets.TcpClient
-
-        Write-Verbose "Attempting connection to $($ServerIp.IPAddressToString):$Port"
         
         $ConnectResult = $TcpClient.BeginConnect($ServerIp, $Port, $null, $null)
         
