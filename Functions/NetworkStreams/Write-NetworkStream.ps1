@@ -1,27 +1,23 @@
 ﻿function Write-NetworkStream {
     Param (
-        [Parameter(Position = 0, Mandatory = $true)]
-        [ValidateSet('Smb', 'Tcp', 'Udp')]
+        [Parameter(Position = 0)]
         [String]$Mode,
     
-        [Parameter(Position = 1, Mandatory = $true)]
+        [Parameter(Position = 1)]
         [Object]$Stream,
     
-        [Parameter(Position = 2, Mandatory = $true)]
+        [Parameter(Position = 2)]
         [Byte[]]$Bytes
     )    
     switch ($Mode) {
         'Smb' { 
             try { $Stream.Pipe.Write($Bytes, 0, $Bytes.Length) }
-            catch { Write-Warning "Failed to send Smb data. $($_.Exception.Message)" ; return }
+            catch { Write-Warning "Failed to send Smb data. $($_.Exception.Message)" }
             continue 
         }
         'Tcp' { 
-            if ($Stream.TcpStream.CanWrite) {
-                try { $Stream.TcpStream.Write($Bytes, 0, $Bytes.Length) }
-                catch { Write-Warning "Failed to write to Tcp stream. $($_.Exception.Message)." }
-            }
-            else { Write-Warning 'Tcp stream cannot be written to.' }
+            try { $Stream.TcpStream.Write($Bytes, 0, $Bytes.Length) }
+            catch { Write-Warning "Failed to write to Tcp stream. $($_.Exception.Message)." }
             continue 
         }
         'Udp' { 

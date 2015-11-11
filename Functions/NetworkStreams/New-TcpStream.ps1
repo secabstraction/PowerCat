@@ -11,15 +11,12 @@
         [Int]$Port, 
         
         [Parameter()]
-        [Int]$Timeout = 60,
-        
-        [Parameter()]
-        [Int]$BufferSize = 65536
+        [Int]$Timeout = 60
     )
     
     if ($Listener.IsPresent) {
 
-        $TcpListener = New-Object Net.Sockets.TcpListener -ArgumentList $Port
+        $TcpListener = New-Object Net.Sockets.TcpListener $Port
         $TcpListener.Start()
         $ConnectResult = $TcpListener.BeginAcceptTcpClient($null, $null)
 
@@ -54,15 +51,12 @@
         $TcpClient = $TcpListener.EndAcceptTcpClient($ConnectResult)
         $TcpListener.Stop()
         
-        if ($TcpClient -eq $null) { 
-            Write-Warning "Connection to $($ServerIp.IPAddressToString):$Port [tcp] failed. $($_.Exception.Message)"
-            return 
-        }
+        if (!$TcpClient) { Write-Warning "Connection to $($ServerIp.IPAddressToString):$Port [tcp] failed." ; return }
 
-        Write-Verbose "Connection from $($TcpClient.Client.RemoteEndPoint.ToString())."
+        Write-Verbose "Connection from $($TcpClient.Client.RemoteEndPoint.ToString()) accepted."
 
         $TcpStream = $TcpClient.GetStream()
-        $Buffer = New-Object Byte[] -ArgumentList $TcpClient.ReceiveBufferSize
+        $Buffer = New-Object Byte[] $TcpClient.ReceiveBufferSize
         
         $Properties = @{
             Socket = $TcpClient.Client
@@ -70,8 +64,7 @@
             Buffer = $Buffer
             Read = $TcpStream.BeginRead($Buffer, 0, $Buffer.Length, $null, $null)
         }
-
-        New-Object -TypeName psobject -Property $Properties
+        New-Object psobject -Property $Properties
     }        
     else { # Client
 
@@ -85,7 +78,7 @@
         do {
             if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey($true)
-                if (($Key.Modifiers -band [ConsoleModifiers]::Control) -and ($Key.Key -eq 'C')) {
+                if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning 'Caught escape sequence, stopping TCP setup.'
                     [console]::TreatControlCAsInput = $false
                     $TcpClient.Dispose()
@@ -111,25 +104,22 @@
             $TcpClient.Dispose()
             return
         }
-
         if (!$TcpClient.Connected) { 
-            Write-Warning "Connection to $($ServerIp.IPAddressToString):$Port [tcp] failed. $($_.Exception.Message)"
+            Write-Warning "Connection to $($ServerIp.IPAddressToString):$Port [tcp] failed."
             $TcpClient.Dispose()
             return 
         }
-
         Write-Verbose "Connection to $($ServerIp.IPAddressToString):$Port [tcp] succeeded!"
         
         $TcpStream = $TcpClient.GetStream()
-        $Buffer = New-Object Byte[] -ArgumentList $TcpClient.ReceiveBufferSize
+        $Buffer = New-Object Byte[] $TcpClient.ReceiveBufferSize
         
         $Properties = @{
             Socket = $TcpClient.Client
             TcpStream = $TcpStream
             Buffer = $Buffer
             Read = $TcpStream.BeginRead($Buffer, 0, $Buffer.Length, $null, $null)
-        }
-        
-        New-Object -TypeName psobject -Property $Properties
+        }        
+        New-Object psobject -Property $Properties
     }
 }

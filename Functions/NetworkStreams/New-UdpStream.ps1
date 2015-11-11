@@ -19,14 +19,14 @@
 
     if ($Listener.IsPresent) {
 
-        $SocketDestinationBuffer = New-Object Byte[] -ArgumentList 65536
-        $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @([Net.IPAddress]::Any, $null)
-        $UdpClient = New-Object Net.Sockets.UDPClient -ArgumentList $Port
+        $SocketDestinationBuffer = New-Object Byte[] 65536
+        $RemoteEndPoint = New-Object Net.IPEndPoint @([Net.IPAddress]::Any, $null)
+        $UdpClient = New-Object Net.Sockets.UDPClient $Port
         $PacketInfo = New-Object Net.Sockets.IPPacketInformation
 
         Write-Verbose "Listening on 0.0.0.0:$Port [udp]"
                 
-        $ConnectHandle = $UdpClient.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
+        $ConnectResult = $UdpClient.Client.BeginReceiveMessageFrom($SocketDestinationBuffer, 0, 65536, [Net.Sockets.SocketFlags]::None, [ref]$RemoteEndPoint, $null, $null)
         
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
         [console]::TreatControlCAsInput = $true
@@ -36,29 +36,26 @@
                 $Key = [console]::ReadKey($true)
                 if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning "Caught escape sequence, stopping UDP Setup."
+                    [console]::TreatControlCAsInput = $false
                     $UdpClient.Dispose()
                     $Stopwatch.Stop()
-                    $SocketDestinationBuffer = $null
-                    [console]::TreatControlCAsInput = $false
                     return
                 }
             }
-
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning "Timeout exceeded, stopping UDP Setup."
+                [console]::TreatControlCAsInput = $false
                 $UdpClient.Dispose()
                 $Stopwatch.Stop()
-                $SocketDestinationBuffer = $null
-                [console]::TreatControlCAsInput = $false
                 return
             }
-        } until ($ConnectHandle.IsCompleted)
+        } until ($ConnectResult.IsCompleted)
         
         [console]::TreatControlCAsInput = $false
         $Stopwatch.Stop()
 
         $SocketFlags = 0
-        $SocketBytesRead = $UdpClient.Client.EndReceiveMessageFrom($ConnectHandle, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
+        $SocketBytesRead = $UdpClient.Client.EndReceiveMessageFrom($ConnectResult, [ref]$SocketFlags, [ref]$RemoteEndPoint, [ref]$PacketInfo)
         $UdpClient.Connect($RemoteEndPoint)
                 
         if ($SocketBytesRead.Count) { $InitialBytes = $SocketDestinationBuffer[0..($SocketBytesRead - 1)] }
@@ -70,21 +67,21 @@
             Socket = $UdpClient.Client
             Read = $UdpClient.BeginReceive($null, $null)
         }
-        $UdpStream = New-Object -TypeName psobject -Property $Properties
+        $UdpStream = New-Object psobject -Property $Properties
     }        
     else { # Client
-        $RemoteEndPoint = New-Object Net.IPEndPoint -ArgumentList @($ServerIp, $Port) 
+        $RemoteEndPoint = New-Object Net.IPEndPoint @($ServerIp, $Port) 
         $UdpClient = New-Object Net.Sockets.UDPClient
         $UdpClient.Connect($RemoteEndPoint)
 
-        Write-Verbose "Sending UDP to $($RemoteEndPoint.ToString()). Make sure to send some data to the server!"
+        Write-Verbose "Sending UDP data to $($RemoteEndPoint.ToString()).`nMake sure to send some data to the server!"
 
         $Properties = @{
             UdpClient = $UdpClient
             Socket = $UdpClient.Client
             Read = $UdpClient.BeginReceive($null, $null)
         }
-        $UdpStream = New-Object -TypeName psobject -Property $Properties
+        $UdpStream = New-Object psobject -Property $Properties
     }
     return $InitialBytes, $UdpStream
 }

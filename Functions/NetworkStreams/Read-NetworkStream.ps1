@@ -1,16 +1,15 @@
 ﻿function Read-NetworkStream {
     Param (
-        [Parameter(Position = 0, Mandatory = $true)]
-        [ValidateSet('Smb', 'Tcp', 'Udp')]
+        [Parameter(Position = 0)]
         [String]$Mode,
     
-        [Parameter(Position = 1, Mandatory = $true)]
+        [Parameter(Position = 1)]
         [Object]$Stream
     )    
     switch ($Mode) {
         'Smb' { 
             try { $BytesRead = $Stream.Pipe.EndRead($Stream.Read) }
-            catch { Write-Warning "Failed to read Smb data. $($_.Exception.Message)." ; continue }
+            catch { Write-Warning "Failed to read Smb stream. $($_.Exception.Message)." ; continue }
 
             if ($BytesRead) {
                 $BytesReceived = $Stream.Buffer[0..($BytesRead - 1)]
@@ -19,7 +18,7 @@
             $Stream.Read = $Stream.Pipe.BeginRead($Stream.Buffer, 0, $Stream.Buffer.Length, $null, $null)
             
             if ($BytesRead) { return $BytesReceived }
-            else { Write-Verbose '0 bytes read from smb stream.' ; continue }
+            else { Write-Verbose '0 bytes read from Smb stream.' ; continue }
         }
         'Tcp' { 
             try { $BytesRead = $Stream.TcpStream.EndRead($Stream.Read) }
@@ -32,7 +31,7 @@
             $Stream.Read = $Stream.TcpStream.BeginRead($Stream.Buffer, 0, $Stream.Buffer.Length, $null, $null)
                 
             if ($BytesRead) { return $BytesReceived }
-            else { Write-Verbose '0 bytes read from tcp stream.' ; continue }
+            else { Write-Verbose '0 bytes read from Tcp stream.' ; continue }
         }
         'Udp' { 
             try { $Bytes = $Stream.UdpClient.EndReceive($Stream.Read, [ref]$Stream.Socket.RemoteEndpoint) }

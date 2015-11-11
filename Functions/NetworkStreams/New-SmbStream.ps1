@@ -38,7 +38,6 @@
                     return
                 }
             }
-
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning "Timeout exceeded, stopping Smb Setup."
                 [console]::TreatControlCAsInput = $false
@@ -66,7 +65,7 @@
             Buffer = $Buffer
             Read = $PipeServer.BeginRead($Buffer, 0, $Buffer.Length, $null, $null)
         }
-        New-Object -TypeName psobject -Property $Properties
+        New-Object psobject -Property $Properties
     }
     else { # Client
 
@@ -77,7 +76,7 @@
             $PipeClient.Dispose()
             return
         }
-        Write-Verbose "Connection to server successful!"
+        Write-Verbose "Connected to $ServerIp`:$PipeName."
 
         $Buffer = New-Object Byte[] $BufferSize
 
@@ -86,6 +85,6 @@
             Buffer = $Buffer
             Read = $PipeClient.BeginRead($Buffer, 0, $Buffer.Length, $null, $null)
         }
-        New-Object -TypeName psobject -Property $Properties
+        New-Object psobject -Property $Properties
     }
 }

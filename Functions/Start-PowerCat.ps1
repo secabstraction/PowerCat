@@ -37,7 +37,7 @@
     DynamicParam {
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
-        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -ParameterDictionary $ParameterDictionary }
+        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
         else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
 
         if ($Execute.IsPresent) { 
@@ -163,22 +163,22 @@
             }
           
             elseif ($PSCmdlet.ParameterSetName -eq 'Execute') {
-                
-                $BytesToSend = $EncodingType.GetBytes("`nPowerCat by @secabstraction`n")
-            
-                if ($ParameterDictionary.ScriptBlock.Value) {
+                if ($ServerStream) {                
+                    $BytesToSend = $EncodingType.GetBytes("`nPowerCat by @secabstraction`n")            
+                    if ($ParameterDictionary.ScriptBlock.Value) {
 
-                    $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
+                        $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
             
-                    $Global:Error.Clear()
+                        $Global:Error.Clear()
             
-                    $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
-                    if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
+                        $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
+                        if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
+                    }
+                    $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+                    Write-NetworkStream $Mode $ServerStream $BytesToSend
+                    $ScriptBlock = $null
+                    $BytesToSend = $null
                 }
-                $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
-                Write-NetworkStream $Mode $ServerStream $BytesToSend
-                $ScriptBlock = $null
-                $BytesToSend = $null
             }
          
             [console]::TreatControlCAsInput = $true
@@ -191,7 +191,7 @@
                 if ([console]::KeyAvailable) {          
                     $Key = [console]::ReadKey()
                     if ($Key.Key -eq [Consolekey]::Escape) {
-                        Write-Warning 'Caught escape sequence, stopping PowerCat.'
+                        Write-Verbose 'Caught escape sequence, stopping PowerCat.'
                         break
                     }
                     if ($PSCmdlet.ParameterSetName -eq 'Console') { 
@@ -210,19 +210,18 @@
 
                 # Redirect received bytes
                 if ($PSCmdlet.ParameterSetName -eq 'Execute') {
+                        try { $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes)) }
+                        catch { break } # network stream closed
             
-                    try { $ScriptBlock = [ScriptBlock]::Create($EncodingType.GetString($ReceivedBytes)) }
-                    catch { break } # network stream closed
-            
-                    $Global:Error.Clear()
+                        $Global:Error.Clear()
 
-                    $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke() | Out-String))
-                    foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) }
-                    $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+                        $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke() | Out-String))
+                        foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) }
+                        $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
                 
-                    Write-NetworkStream $Mode $ServerStream $BytesToSend 
-                    $BytesToSend = $null
-                    $ScriptBlock = $null
+                        Write-NetworkStream $Mode $ServerStream $BytesToSend 
+                        $BytesToSend = $null
+                        $ScriptBlock = $null
                     continue
                 }
                 elseif ($PSCmdlet.ParameterSetName -eq 'Relay') { Write-NetworkStream $RelayMode $RelayStream $ReceivedBytes ; continue }
