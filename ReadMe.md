@@ -18,7 +18,7 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
     -Port           # The port to listen on.
 	-PipeName       # Name of pipe to listen on.
 	
-    -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
+    -Relay          # Format: "<Mode>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
     -ReceiveFile    # Filepath of file to be written.
