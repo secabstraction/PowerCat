@@ -203,7 +203,7 @@
                     if ($ServerStream.Read.IsCompleted) { $ReceivedBytes = Read-NetworkStream $Mode $ServerStream } 
                     else { Start-Sleep -Milliseconds 1 ; continue }
                 }
-                else { Write-Warning "$Mode connection broken, exiting." ; break }
+                else { Write-Verbose "$Mode connection broken, exiting." ; break }
 
                 # Redirect received bytes
                 if ($PSCmdlet.ParameterSetName -eq 'Execute') {
