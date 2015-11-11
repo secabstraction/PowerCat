@@ -1,18 +1,18 @@
 PowerCat
 ========
-A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
+####A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
 ######Inspired by: https://github.com/besimorhino/powercat
 Installation
 ------------
-PowerCat is packaged as a PowerShell module.  You need to import the module to use its functions.
+PowerCat is packaged as a PowerShell module.  You must import the module to use its functions.
 ###
 ```powershell
-    # Import the functions using psd1 file:
+    # Import the functions via the psd1 file:
     Import-Module PowerCat.psd1
 ```
 ### Functions & Parameters:
 ```powershell    
-    Start-PowerCat # This starts a listener/server.
+    Start-PowerCat # Starts a listener/server.
     
     -Mode           # Defaults to Tcp, can also specify Udp or Smb.
     -Port           # The port to listen on.
@@ -26,7 +26,7 @@ PowerCat is packaged as a PowerShell module.  You need to import the module to u
     -KeepAlive      # Restart after disconnecting.
     -Timeout        # Timeout option. Default: 60 seconds
 	
-	Connect-PowerCat # This connects a client to a listener/server.
+	Connect-PowerCat # Connects a client to a listener/server.
 	
     -Mode           # Defaults to Tcp, can also specify Udp or Smb
 	-RemoteIp       # IPv4 address of host to connect to.
@@ -126,3 +126,6 @@ PowerCat can also be used to perform port-scans, and start persistent listeners.
     # Persistent listener:
     Start-PowerCat -Port 443 -Execute -KeepAlive
 ```
+Exiting
+----------
+In most cases, the ESC key can be used to gracefully exit PowerCat.
