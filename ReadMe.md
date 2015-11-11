@@ -126,8 +126,3 @@ PowerCat can also be used to perform port-scans, and start persistent listeners.
     # Persistent listener:
     Start-PowerCat -Port 443 -Execute -KeepAlive
 ```
-=======
-```powershell
-Write-Warning 'PowerCat is under construction. Check back soon for updates.'
-Write-Warning 'I will remove this warning when the code is functional.'
-Write-Warning 'If you want to follow along, check out the working branch.'
