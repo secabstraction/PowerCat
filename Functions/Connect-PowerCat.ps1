@@ -7,7 +7,6 @@
         [String]$Mode = 'Tcp',
 
         [Parameter(Position = 1, Mandatory = $true)]
-        [ValidatePattern("^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")]
         [String]$RemoteIp,
         
         [Parameter(ParameterSetName = 'Execute')]
@@ -55,6 +54,10 @@
         return $ParameterDictionary
     }
     Begin {     
+        if ($RemoteIp -notmatch "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$") { 
+            Write-Warning "$RemoteIp is not a valid IPv4 address."
+            return 
+        }
         $ServerIp = [Net.IPAddress]::Parse($RemoteIp)
 
         switch ($Mode) {
@@ -196,7 +199,7 @@
             if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey()
                 if ($Key.Key -eq [Consolekey]::Escape) {
-                    Write-Warning 'Caught escape sequence, stopping PowerCat.'
+                    Write-Verbose 'Caught escape sequence, stopping PowerCat.'
                     break
                 }
                 if ($PSCmdlet.ParameterSetName -eq 'Console') { 
