@@ -114,7 +114,7 @@ Payloads can be generated using the New-PowerCatPayload function.
 ```
 Misc Usage
 ----------
-PowerCat can also be used to perform port-scans, and start persistent listeners.
+PowerCat can also be used to perform port-scans, start persistent listeners, act as a simple web server, etc.
 ###
 ```powershell
     # Basic TCP port scan:
@@ -125,6 +125,9 @@ PowerCat can also be used to perform port-scans, and start persistent listeners.
         
     # Persistent listener:
     Start-PowerCat -Port 443 -Execute -KeepAlive
+	
+	# Simple Web Server:
+	Start-PowerCat -Port 80 -SendFile index.html
 ```
 Exiting
 ----------
