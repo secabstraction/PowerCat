@@ -1,6 +1,6 @@
 PowerCat
 ========
-####A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
+#####A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
 ######Inspired by: https://github.com/besimorhino/powercat
 Installation
 ------------
