@@ -81,7 +81,8 @@
                 if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning 'Caught escape sequence, stopping TCP setup.'
                     [console]::TreatControlCAsInput = $false
-                    $TcpClient.Dispose()
+                    if ($PSVersionTable.CLRVersion.Major -lt 4) { $TcpClient.Close() }
+                    else { $TcpClient.Dispose() }
                     $Stopwatch.Stop()
                     return
                 }
@@ -89,7 +90,8 @@
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning 'Timeout exceeded, stopping TCP setup.'
                 [console]::TreatControlCAsInput = $false
-                $TcpClient.Dispose()
+                if ($PSVersionTable.CLRVersion.Major -lt 4) { $TcpClient.Close() }
+                else { $TcpClient.Dispose() }
                 $Stopwatch.Stop()
                 return
             }
@@ -101,13 +103,9 @@
         try { $TcpClient.EndConnect($ConnectResult) }
         catch {
             Write-Warning "Connection to $($ServerIp.IPAddressToString):$Port [tcp] failed. $($_.Exception.Message)"
-            $TcpClient.Dispose()
+            if ($PSVersionTable.CLRVersion.Major -lt 4) { $TcpClient.Close() }
+            else { $TcpClient.Dispose() }
             return
-        }
-        if (!$TcpClient.Connected) { 
-            Write-Warning "Connection to $($ServerIp.IPAddressToString):$Port [tcp] failed."
-            $TcpClient.Dispose()
-            return 
         }
         Write-Verbose "Connection to $($ServerIp.IPAddressToString):$Port [tcp] succeeded!"
         

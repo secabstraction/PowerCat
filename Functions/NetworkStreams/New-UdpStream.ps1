@@ -37,7 +37,8 @@
                 if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning "Caught escape sequence, stopping UDP Setup."
                     [console]::TreatControlCAsInput = $false
-                    $UdpClient.Dispose()
+                    if ($PSVersionTable.CLRVersion.Major -lt 4) { $UdpClient.Close() }
+                    else { $UdpClient.Dispose() }
                     $Stopwatch.Stop()
                     return
                 }
@@ -45,7 +46,8 @@
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning "Timeout exceeded, stopping UDP Setup."
                 [console]::TreatControlCAsInput = $false
-                $UdpClient.Dispose()
+                if ($PSVersionTable.CLRVersion.Major -lt 4) { $UdpClient.Close() }
+                else { $UdpClient.Dispose() }
                 $Stopwatch.Stop()
                 return
             }
