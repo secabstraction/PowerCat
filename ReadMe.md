@@ -1,7 +1,7 @@
 PowerCat
 ========
 A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
-Inspired by: https://github.com/besimorhino/powercat
+######Inspired by: https://github.com/besimorhino/powercat
 Installation
 ------------
 PowerCat is packaged as a PowerShell module.  You need to import the module to use its functions.
