@@ -83,10 +83,10 @@
              'UTF8' { $EncodingType = New-Object Text.UTF8Encoding ; continue }
             'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
         }
-
-        if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream = New-Object IO.FileStream -ArgumentList @($ReceiveFile, [IO.FileMode]::Append) }
-      
-        if ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
+        
+        if ($PSCmdlet.ParameterSetName -eq 'Input') { Write-NetworkStream $Mode $ClientStream $EncodingType.GetBytes($Input) }     
+        elseif ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream = New-Object IO.FileStream @($ReceiveFile, [IO.FileMode]::Append) } 
+        elseif ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
             
             Write-Verbose "Attempting to send $SendFile"
 
@@ -95,7 +95,7 @@
                 if ($Mode -eq 'Tcp') { $ClientStream.Socket.SendFile($SendFile) ; sleep 1 } 
                     
                 else {
-                    try { $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open) }
+                    try { $FileStream = New-Object IO.FileStream @($SendFile, [IO.FileMode]::Open) }
                     catch { Write-Warning $_.Exception.Message }
 
                     if ($BytesLeft = $FileStream.Length) { # goto cleanup
@@ -137,7 +137,6 @@
             }
             else { Write-Warning "$SendFile does not exist." }
         }
-
         elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
             
             Write-Verbose "Setting up relay stream..."
@@ -166,25 +165,25 @@
                 else { Write-Warning "$($RelayConfig[1]) is not a valid IPv4 address." }
             }
             else { Write-Warning 'Invalid relay format.' }
-        }
-          
+        }          
         elseif ($PSCmdlet.ParameterSetName -eq 'Execute') {
-                
-            $BytesToSend = $EncodingType.GetBytes("`nPowerCat by @secabstraction`n")
+            if ($ClientStream) {    
+                $BytesToSend = $EncodingType.GetBytes("`nPowerCat by @secabstraction`n")
             
-            if ($ParameterDictionary.ScriptBlock.Value) {
+                if ($ParameterDictionary.ScriptBlock.Value) {
 
-                $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
+                    $ScriptBlock = $ParameterDictionary.ScriptBlock.Value
             
-                $Global:Error.Clear()
+                    $Global:Error.Clear()
             
-                $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
-                if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
+                    $BytesToSend += $EncodingType.GetBytes(($ScriptBlock.Invoke($ParameterDictionary.ArgumentList.Value) | Out-String))
+                    if ($Global:Error.Count) { foreach ($Err in $Global:Error) { $BytesToSend += $EncodingType.GetBytes($Err.Exception.Message) } }
+                }
+                $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
+                Write-NetworkStream $Mode $ClientStream $BytesToSend
+                $ScriptBlock = $null
+                $BytesToSend = $null
             }
-            $BytesToSend += $EncodingType.GetBytes(("`nPS $((Get-Location).Path)> "))
-            Write-NetworkStream $Mode $ClientStream $BytesToSend
-            $ScriptBlock = $null
-            $BytesToSend = $null
         }
     }
     Process {             
@@ -192,8 +191,7 @@
 
         while ($true) {
         
-            if ($PSCmdlet.ParameterSetName -eq 'SendFile') { break } 
-            if ($Disconnect.IsPresent) { break } # Skip to Cleanup
+            if ($PSCmdlet.ParameterSetName -eq 'SendFile' -or $Disconnect.IsPresent) { break } # Skip to Cleanup
             
             # Catch Esc / Read-Host
             if ([console]::KeyAvailable) {          
@@ -245,7 +243,7 @@
             }
         }
     }
-    End {   
+    End { # Cleanup
         [console]::TreatControlCAsInput = $false
 
         if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream.Flush() ; $FileStream.Dispose() }

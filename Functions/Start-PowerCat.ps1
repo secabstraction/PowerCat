@@ -78,9 +78,8 @@
                 'UTF32' { $EncodingType = New-Object Text.UTF32Encoding ; continue }
             }
 
-            if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream = New-Object IO.FileStream -ArgumentList @($ReceiveFile, [IO.FileMode]::Append) }
-      
-            if ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
+            if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream = New-Object IO.FileStream @($ReceiveFile, [IO.FileMode]::Append) }      
+            elseif ($PSCmdlet.ParameterSetName -eq 'SendFile') {   
             
                 Write-Verbose "Attempting to send $SendFile"
 
@@ -89,7 +88,7 @@
                     if ($Mode -eq 'Tcp') { $ServerStream.Socket.SendFile($SendFile) ; sleep 1 } 
                     
                     else {
-                        try { $FileStream = New-Object IO.FileStream -ArgumentList @($SendFile, [IO.FileMode]::Open) }
+                        try { $FileStream = New-Object IO.FileStream @($SendFile, [IO.FileMode]::Open) }
                         catch { Write-Warning $_.Exception.Message }
 
                         if ($BytesLeft = $FileStream.Length) { # goto Cleanup
@@ -131,7 +130,6 @@
                 }
                 else { Write-Warning "$SendFile does not exist." }
             }
-
             elseif ($PSCmdlet.ParameterSetName -eq 'Relay') {
             
                 Write-Verbose "Setting up relay stream..."
@@ -160,8 +158,7 @@
                     else { Write-Warning "$($RelayConfig[1]) is not a valid IPv4 address." }
                 }
                 else { Write-Warning 'Invalid relay format.' }
-            }
-          
+            }          
             elseif ($PSCmdlet.ParameterSetName -eq 'Execute') {
                 if ($ServerStream) {                
                     $BytesToSend = $EncodingType.GetBytes("`nPowerCat by @secabstraction`n")            
