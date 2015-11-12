@@ -10,7 +10,10 @@
         [Parameter(Position = 1)]
         [Int]$Port, 
         
-        [Parameter()]
+        [Parameter(Position = 2)]
+        [String]$SslKey, 
+
+        [Parameter(Position = 3)]
         [Int]$Timeout = 60
     )
     
@@ -57,6 +60,13 @@
 
         $TcpStream = $TcpClient.GetStream()
         $Buffer = New-Object Byte[] $TcpClient.ReceiveBufferSize
+
+        if ($PSBoundParameters.SslKey) { 
+            $TcpStream = New-Object System.Net.Security.SslStream($TcpStream, $false,{ param($Sender, $Cert, $Chain, $Policy) return $true })
+            $Certificate = New-X509Certificate -SslKey $SslKey
+            $TcpStream.AuthenticateAsServer($Certificate)
+            Write-Verbose "SSL Encrypted: $($TcpStream.IsEncrypted)"
+        }
         
         $Properties = @{
             Socket = $TcpClient.Client
@@ -112,6 +122,12 @@
         $TcpStream = $TcpClient.GetStream()
         $Buffer = New-Object Byte[] $TcpClient.ReceiveBufferSize
         
+        if ($PSBoundParameters.SslKey) { 
+            $TcpStream = New-Object System.Net.Security.SslStream($TcpStream, $false,{ param($Sender, $Cert, $Chain, $Policy) return $true })
+            $TcpStream.AuthenticateAsClient($SslKey)
+            Write-Verbose "SSL Encrypted: $($TcpStream.IsEncrypted)"
+        }
+
         $Properties = @{
             Socket = $TcpClient.Client
             TcpStream = $TcpStream

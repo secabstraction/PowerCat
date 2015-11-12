@@ -46,6 +46,8 @@
 
         if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 2 -ParameterDictionary $ParameterDictionary }
         else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 2 -ParameterDictionary $ParameterDictionary }
+
+        if ($Mode -ne 'Udp') { $SslParam = New-RuntimeParameter -Name SslKey -Type String -ParameterDictionary $ParameterDictionary }
         
         if ($Execute.IsPresent) { 
             $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
@@ -62,12 +64,12 @@
 
         switch ($Mode) {
             'Smb' { 
-                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value -TimeOut $Timeout  }
+                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value $ParameterDictionary.SslKey.Value $Timeout  }
                 catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
                 continue 
             }
             'Tcp' { 
-                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value -TimeOut $Timeout }
+                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value $ParameterDictionary.SslKey.Value $Timeout }
                 catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
                 continue 
             }

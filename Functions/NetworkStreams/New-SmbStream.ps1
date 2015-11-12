@@ -11,7 +11,10 @@
         [ValidateNotNullorEmpty()]
         [String]$PipeName, 
         
-        [Parameter()]
+        [Parameter(Position = 2)]
+        [String]$SslKey, 
+
+        [Parameter(Position = 3)]
         [Int]$Timeout = 60,
         
         [Parameter()]
@@ -58,6 +61,13 @@
         Write-Verbose "Connection from client accepted."
 
         $Buffer = New-Object Byte[] $BufferSize
+        
+        if ($PSBoundParameters.SslKey) { 
+            $PipeServer = New-Object System.Net.Security.SslStream($PipeServer, $false,{ param($Sender, $Cert, $Chain, $Policy) return $true })
+            $Certificate = New-X509Certificate -SslKey $SslKey
+            $PipeServer.AuthenticateAsServer($Certificate)
+            Write-Verbose "SSL Encrypted: $($PipeServer.IsEncrypted)"
+        }
 
         $Properties = @{
             Pipe = $PipeServer
@@ -78,6 +88,12 @@
         Write-Verbose "Connected to $ServerIp`:$PipeName."
 
         $Buffer = New-Object Byte[] $BufferSize
+        
+        if ($PSBoundParameters.SslKey) { 
+            $PipeClient = New-Object System.Net.Security.SslStream($PipeClient, $false,{ param($Sender, $Cert, $Chain, $Policy) return $true })
+            $PipeClient.AuthenticateAsClient($SslKey)
+            Write-Verbose "SSL Encrypted: $($PipeClient.IsEncrypted)"
+        }
 
         $Properties = @{
             Pipe = $PipeClient
