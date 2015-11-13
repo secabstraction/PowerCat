@@ -9,7 +9,7 @@
     switch ($Mode) {
         'Smb' { 
             try { $Stream.Pipe.Dispose() }
-            catch { Write-Verbose "Failed to dispose Smb stream. $($_.Exception.Message)." }
+            catch { Write-Verbose "Failed to close Smb stream. $($_.Exception.Message)." }
             continue 
         }
         'Tcp' { 
@@ -17,7 +17,7 @@
                 if ($PSVersionTable.CLRVersion.Major -lt 4) { $Stream.Socket.Close() ; $Stream.TcpStream.Close() }
                 else { $Stream.Socket.Dispose() ; $Stream.TcpStream.Dispose() }
             }
-            catch { Write-Verbose "Failed to dispose Tcp socket. $($_.Exception.Message)." }
+            catch { Write-Verbose "Failed to close Tcp stream. $($_.Exception.Message)." }
             continue 
         }
         'Udp' { 
@@ -25,7 +25,7 @@
                 if ($PSVersionTable.CLRVersion.Major -lt 4) { $Stream.Socket.Close() ; $Stream.UdpClient.Close() }
                 else { $Stream.Socket.Dispose() ; $Stream.UdpClient.Dispose() }
             }
-            catch { Write-Verbose "Failed to dispose Udp socket. $($_.Exception.Message)." }
+            catch { Write-Verbose "Failed to close Udp stream. $($_.Exception.Message)." }
         }
     }
 }

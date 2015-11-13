@@ -37,13 +37,15 @@
     DynamicParam {
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
-        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
-        else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+        if ($Mode -eq 'Smb') { New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+        else { New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+
+        if ($Mode -eq 'Tcp') { New-RuntimeParameter -Name SslCn -Type String -ParameterDictionary $ParameterDictionary }
 
         if ($Execute.IsPresent) { 
-            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
-            $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
-            $KeepAliveParam = New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary
+            New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
+            New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
+            New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary
         }
         return $ParameterDictionary
     }
@@ -52,22 +54,24 @@
         while ($true) {
             switch ($Mode) {
                 'Smb' { 
-                    try { $ServerStream = New-SmbStream -Listener $ParameterDictionary.PipeName.Value -TimeOut $Timeout }
+                    try { $ServerStream = New-SmbStream -Listener $ParameterDictionary.PipeName.Value $Timeout }
                     catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
                     continue 
                 }
                 'Tcp' { 
-                    if ((Test-Port -Number $ParameterDictionary.Port.Value -Transport Tcp)) {
-                        try { $ServerStream = New-TcpStream -Listener $ParameterDictionary.Port.Value -TimeOut $Timeout }
-                        catch { Write-Warning "$($_.Exception.Message)" }
+                    if ((Test-Port $ParameterDictionary.Port.Value Tcp)) {
+                        try { $ServerStream = New-TcpStream -Listener $ParameterDictionary.Port.Value $ParameterDictionary.SslCn.Value $Timeout }
+                        catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
                     }
+                    else { return }
                     continue 
                 }
                 'Udp' { 
-                    if ((Test-Port -Number $ParameterDictionary.Port.Value -Transport Udp)) {
+                    if ((Test-Port $ParameterDictionary.Port.Value Udp)) {
                         try { $InitialBytes, $ServerStream = New-UdpStream -Listener $ParameterDictionary.Port.Value -TimeOut $Timeout }
                         catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; return }
                     }
+                    else { return }
                 }
             }          
             switch ($Encoding) {
@@ -234,8 +238,7 @@
             }
 
             # Cleanup
-            [console]::TreatControlCAsInput = $false
-
+            Write-Host "`n"
             if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream.Flush() ; $FileStream.Dispose() }
       
             try { Close-NetworkStream $Mode $ServerStream }
@@ -245,6 +248,7 @@
                 try { Close-NetworkStream $RelayMode $RelayStream }
                 catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
             }           
+            [console]::TreatControlCAsInput = $false
             if (!$ParameterDictionary.KeepAlive.IsSet) { break }
         }
     }
