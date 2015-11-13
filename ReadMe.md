@@ -18,11 +18,11 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
     -Port           # The port to listen on.
 	-PipeName       # Name of pipe to listen on.
 	
+	-SslCn			# Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
     -ReceiveFile    # Filepath of file to be written.
-	-SslCn			# Common name for Ssl encrypting Tcp.
     -Disconnect     # Disconnect after connecting.
     -KeepAlive      # Restart after disconnecting.
     -Timeout        # Timeout option. Default: 60 seconds
@@ -34,11 +34,11 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
     -Port           # The port to connect to.
 	-PipeName       # Name of pipe to connect to.
 	
+	-SslCn			# Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
     -ReceiveFile    # Filepath of file to be written.
-	-SslCn			# Common name for Ssl encrypting Tcp.
     -Disconnect     # Disconnect after connecting.
     -Timeout        # Timeout option. Default: 60 seconds
 ```
