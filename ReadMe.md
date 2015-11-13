@@ -95,9 +95,9 @@ PowerCat generates X509 certificates on-the-fly to provide SSL encryption of TCP
     Start-PowerCat -Mode Tcp -Port 80 -SslCn <Certificate Common Name> -Execute
         
     # Connect to an SSL encrypted Ncat listener:
-	Ncat Setup:
-		openssl req -X509 -newkey rsa:2048 -subj /CN=PowerCat -days 90 -keyout key.pem -out cert.pem
-		ncat -l -p 80 --ssl --ssl-cert cert.pem --ssl-key key.pem
+	# Setup *nix with openssl & Ncat:
+	# openssl req -X509 -newkey rsa:2048 -subj /CN=PowerCat -days 90 -keyout key.pem -out cert.pem
+	# ncat -l -p 80 --ssl --ssl-cert cert.pem --ssl-key key.pem
 	
 	Connect-PowerCat -Mode Tcp -RemoteIp 10.1.1.1 -Port 80 -SslCn PowerCat 
 ```
