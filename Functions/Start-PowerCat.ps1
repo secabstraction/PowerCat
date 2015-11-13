@@ -59,17 +59,19 @@
                     continue 
                 }
                 'Tcp' { 
-                    if ((Test-Port -Number $ParameterDictionary.Port.Value -Transport Tcp)) {
+                    if ((Test-Port $ParameterDictionary.Port.Value Tcp)) {
                         try { $ServerStream = New-TcpStream -Listener $ParameterDictionary.Port.Value $ParameterDictionary.SslCn.Value $Timeout }
                         catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
                     }
+                    else { return }
                     continue 
                 }
                 'Udp' { 
-                    if ((Test-Port -Number $ParameterDictionary.Port.Value -Transport Udp)) {
+                    if ((Test-Port $ParameterDictionary.Port.Value Udp)) {
                         try { $InitialBytes, $ServerStream = New-UdpStream -Listener $ParameterDictionary.Port.Value -TimeOut $Timeout }
                         catch { Write-Warning "Failed to open Udp stream. $($_.Exception.Message)" ; return }
                     }
+                    else { return }
                 }
             }          
             switch ($Encoding) {
