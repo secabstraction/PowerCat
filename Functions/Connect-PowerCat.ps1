@@ -94,48 +94,45 @@
 
             if ((Test-Path $SendFile)) { 
             
-                if ($Mode -eq 'Tcp') { $ClientStream.Socket.SendFile($SendFile) ; sleep 1 } 
+                try { $FileStream = New-Object IO.FileStream @($SendFile, [IO.FileMode]::Open) }
+                catch { Write-Warning $_.Exception.Message }
+
+                if ($BytesLeft = $FileStream.Length) { # goto cleanup
                     
-                else {
-                    try { $FileStream = New-Object IO.FileStream @($SendFile, [IO.FileMode]::Open) }
-                    catch { Write-Warning $_.Exception.Message }
+                    $FileOffset = 0
+                    if ($BytesLeft -gt 4608) { # Max packet size for Ncat
 
-                    if ($BytesLeft = $FileStream.Length) { # goto cleanup
-                    
-                        $FileOffset = 0
-                        if ($BytesLeft -gt 4608) { # Max packet size for Ncat
+                        $BytesToSend = New-Object Byte[] 4608
 
-                            $BytesToSend = New-Object Byte[] 4608
+                        while ($BytesLeft -gt 4608) {
 
-                            while ($BytesLeft -gt 4608) {
-
-                                [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                                [void]$FileStream.Read($BytesToSend, 0, 4608)
+                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                            [void]$FileStream.Read($BytesToSend, 0, 4608)
                             
-                                $FileOffset += 4608
-                                $BytesLeft -= 4608
-
-                                Write-NetworkStream $Mode $ClientStream $BytesToSend
-                            } 
-                            # Send last packet
-                            $BytesToSend = New-Object Byte[] $BytesLeft
-                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                            [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+                            $FileOffset += 4608
+                            $BytesLeft -= 4608
 
                             Write-NetworkStream $Mode $ClientStream $BytesToSend
-                        }
-                        else { # Only need to send one packet
-                            $BytesToSend = New-Object Byte[] $BytesLeft
-                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                            [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+                        } 
+                        # Send last packet
+                        $BytesToSend = New-Object Byte[] $BytesLeft
+                        [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                        [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
 
-                            Write-NetworkStream $Mode $ClientStream $BytesToSend
-                        }
-                        $FileStream.Flush()
-                        $FileStream.Dispose()
+                        Write-NetworkStream $Mode $ClientStream $BytesToSend
                     }
-                    if ($Mode -eq 'Smb') { $ClientStream.Pipe.WaitForPipeDrain() } 
+                    else { # Only need to send one packet
+                        $BytesToSend = New-Object Byte[] $BytesLeft
+                        [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                        [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+
+                        Write-NetworkStream $Mode $ClientStream $BytesToSend
+                    }
+                    $FileStream.Flush()
+                    $FileStream.Dispose()
                 }
+                if ($Mode -eq 'Smb') { $ClientStream.Pipe.WaitForPipeDrain() } 
+                if ($Mode -eq 'Tcp') { sleep 1 }
             }
             else { Write-Warning "$SendFile does not exist." }
         }

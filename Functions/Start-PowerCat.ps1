@@ -88,49 +88,46 @@
                 Write-Verbose "Attempting to send $SendFile"
 
                 if ((Test-Path $SendFile)) { 
-            
-                    if ($Mode -eq 'Tcp') { $ServerStream.Socket.SendFile($SendFile) ; sleep 1 } 
                     
-                    else {
-                        try { $FileStream = New-Object IO.FileStream @($SendFile, [IO.FileMode]::Open) }
-                        catch { Write-Warning $_.Exception.Message }
+                    try { $FileStream = New-Object IO.FileStream @($SendFile, [IO.FileMode]::Open) }
+                    catch { Write-Warning $_.Exception.Message }
 
-                        if ($BytesLeft = $FileStream.Length) { # goto Cleanup
+                    if ($BytesLeft = $FileStream.Length) { # goto Cleanup
                     
-                            $FileOffset = 0
-                            if ($BytesLeft -gt 4608) { # Max packet size for Ncat
+                        $FileOffset = 0
+                        if ($BytesLeft -gt 4608) { # Max packet size for Ncat
 
-                                $BytesToSend = New-Object Byte[] 4608
+                            $BytesToSend = New-Object Byte[] 4608
 
-                                while ($BytesLeft -gt 4608) {
+                            while ($BytesLeft -gt 4608) {
 
-                                    [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                                    [void]$FileStream.Read($BytesToSend, 0, 4608)
+                                [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                                [void]$FileStream.Read($BytesToSend, 0, 4608)
                             
-                                    $FileOffset += 4608
-                                    $BytesLeft -= 4608
-
-                                    Write-NetworkStream $Mode $ServerStream $BytesToSend
-                                } 
-                                # Send last packet
-                                $BytesToSend = New-Object Byte[] $BytesLeft
-                                [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                                [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+                                $FileOffset += 4608
+                                $BytesLeft -= 4608
 
                                 Write-NetworkStream $Mode $ServerStream $BytesToSend
-                            }
-                            else { # Only need to send one packet
-                                $BytesToSend = New-Object Byte[] $BytesLeft
-                                [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
-                                [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+                            } 
+                            # Send last packet
+                            $BytesToSend = New-Object Byte[] $BytesLeft
+                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                            [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
 
-                                Write-NetworkStream $Mode $ServerStream $BytesToSend
-                            }
-                            $FileStream.Flush()
-                            $FileStream.Dispose()
+                            Write-NetworkStream $Mode $ServerStream $BytesToSend
                         }
-                        if ($Mode -eq 'Smb') { $ServerStream.Pipe.WaitForPipeDrain() } 
+                        else { # Only need to send one packet
+                            $BytesToSend = New-Object Byte[] $BytesLeft
+                            [void]$FileStream.Seek($FileOffset, [IO.SeekOrigin]::Begin)
+                            [void]$FileStream.Read($BytesToSend, 0, $BytesLeft)
+
+                            Write-NetworkStream $Mode $ServerStream $BytesToSend
+                        }
+                        $FileStream.Flush()
+                        $FileStream.Dispose()
                     }
+                    if ($Mode -eq 'Smb') { $ServerStream.Pipe.WaitForPipeDrain() } 
+                    if ($Mode -eq 'Tcp') { sleep 1 } 
                 }
                 else { Write-Warning "$SendFile does not exist." }
             }
