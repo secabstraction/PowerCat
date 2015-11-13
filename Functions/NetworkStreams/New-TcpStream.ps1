@@ -11,7 +11,7 @@
         [Int]$Port, 
         
         [Parameter(Position = 2)]
-        [String]$SslKey, 
+        [String]$SslCn, 
 
         [Parameter(Position = 3)]
         [Int]$Timeout = 60
@@ -26,10 +26,10 @@
         Write-Verbose "Listening on 0.0.0.0:$Port [tcp]"
         
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-        [console]::TreatControlCAsInput = $true
+        #[console]::TreatControlCAsInput = $true
       
         do {
-            if ([console]::KeyAvailable) {          
+            <#if ([console]::KeyAvailable) {          
                 $Key = [console]::ReadKey($true)
                 if ($Key.Key -eq [Consolekey]::Escape) {
                     Write-Warning 'Caught escape sequence, stopping TCP setup.'
@@ -38,17 +38,17 @@
                     $Stopwatch.Stop()
                     return
                 }
-            }
+            }#>
             if ($Stopwatch.Elapsed.TotalSeconds -gt $Timeout) {
                 Write-Warning 'Timeout exceeded, stopping TCP setup.'
-                [console]::TreatControlCAsInput = $false
+                #[console]::TreatControlCAsInput = $false
                 $TcpListener.Stop()
                 $Stopwatch.Stop()
                 return
             }
         } until ($ConnectResult.IsCompleted)
         
-        [console]::TreatControlCAsInput = $false
+        #[console]::TreatControlCAsInput = $false
         $Stopwatch.Stop() 
 
         $TcpClient = $TcpListener.EndAcceptTcpClient($ConnectResult)
@@ -61,9 +61,9 @@
         $TcpStream = $TcpClient.GetStream()
         $Buffer = New-Object Byte[] $TcpClient.ReceiveBufferSize
 
-        if ($PSBoundParameters.SslKey) { 
-            $TcpStream = New-Object System.Net.Security.SslStream($TcpStream, $false,{ param($Sender, $Cert, $Chain, $Policy) return $true })
-            $Certificate = New-X509Certificate -SslKey $SslKey
+        if ($PSBoundParameters.SslCn) { 
+            $TcpStream = New-Object System.Net.Security.SslStream($TcpStream, $false)
+            $Certificate = New-X509Certificate $SslCn
             $TcpStream.AuthenticateAsServer($Certificate)
             Write-Verbose "SSL Encrypted: $($TcpStream.IsEncrypted)"
         }
@@ -122,9 +122,9 @@
         $TcpStream = $TcpClient.GetStream()
         $Buffer = New-Object Byte[] $TcpClient.ReceiveBufferSize
         
-        if ($PSBoundParameters.SslKey) { 
-            $TcpStream = New-Object System.Net.Security.SslStream($TcpStream, $false,{ param($Sender, $Cert, $Chain, $Policy) return $true })
-            $TcpStream.AuthenticateAsClient($SslKey)
+        if ($PSBoundParameters.SslCn) { 
+            $TcpStream = New-Object System.Net.Security.SslStream($TcpStream, $false, { param($Sender, $Cert, $Chain, $Policy) return $true })
+            $TcpStream.AuthenticateAsClient($SslCn)
             Write-Verbose "SSL Encrypted: $($TcpStream.IsEncrypted)"
         }
 
