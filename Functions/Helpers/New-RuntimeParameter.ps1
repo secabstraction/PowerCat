@@ -1,5 +1,9 @@
 ﻿function New-RuntimeParameter { 
-    [CmdletBinding()]
+<#
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+#>
+[CmdletBinding()]
     Param (
         [Parameter(Position = 0, Mandatory = $true)]
         [ValidateNotNullOrEmpty()]

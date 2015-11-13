@@ -1,5 +1,8 @@
 ﻿function Test-Port { 
-    [CmdletBinding()]
+<#
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+#>
     Param (
         [Parameter(Position = 0, Mandatory = $true)]
         [Int]$Number,

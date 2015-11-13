@@ -1,4 +1,8 @@
 function Send-PingAsync {
+<#
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+#>
 [CmdLetBinding()]
      Param(
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]

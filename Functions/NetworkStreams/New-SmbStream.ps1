@@ -1,4 +1,8 @@
 ﻿function New-SmbStream {
+<#
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+#>
 [CmdletBinding(DefaultParameterSetName = 'Client')]
     Param (
         [Parameter(Position = 0, ParameterSetName = 'Client')]

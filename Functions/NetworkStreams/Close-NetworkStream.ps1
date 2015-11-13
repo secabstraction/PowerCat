@@ -1,4 +1,8 @@
 ﻿function Close-NetworkStream {
+<#
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+#>
     Param (
         [Parameter(Position = 0)]
         [String]$Mode,

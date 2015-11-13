@@ -1,4 +1,8 @@
 ﻿function Connect-PowerCat {
+<#
+Author: Jesse Davis (@secabstraction)
+License: BSD 3-Clause
+#>
 [CmdletBinding(DefaultParameterSetName = 'Console')]
     Param (
         [Parameter(Position = 0)]
