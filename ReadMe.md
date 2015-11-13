@@ -91,7 +91,7 @@ SSL
 PowerCat generates X509 certificates on-the-fly to provide SSL encryption of TCP connections. 
 ###
 ```powershell
-	# Admin privileges are required to generate a self-signed certificate.
+	# Admin privileges are required to generate the self-signed certificate.
 	
     # Serve an SSL-Encrypted (Power)Shell:
     Start-PowerCat -Mode Tcp -Port 80 -SslCn <Certificate Common Name> -Execute

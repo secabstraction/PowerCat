@@ -9,9 +9,9 @@
         
         [Parameter(Position = 1)]
         [ValidateNotNullorEmpty()]
-        [String]$PipeName, 
-        
-        [Parameter()]
+        [String]$PipeName,  
+
+        [Parameter(Position = 3)]
         [Int]$Timeout = 60,
         
         [Parameter()]

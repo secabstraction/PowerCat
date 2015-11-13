@@ -44,12 +44,14 @@
     DynamicParam { 
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
 
-        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 2 -ParameterDictionary $ParameterDictionary }
-        else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 2 -ParameterDictionary $ParameterDictionary }
+        if ($Mode -eq 'Smb') { New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 2 -ParameterDictionary $ParameterDictionary }
+        else { New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 2 -ParameterDictionary $ParameterDictionary }
+
+        if ($Mode -eq 'Tcp') { New-RuntimeParameter -Name SslCn -Type String -ParameterDictionary $ParameterDictionary }
         
         if ($Execute.IsPresent) { 
-            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
-            $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
+            New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
+            New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
         return $ParameterDictionary
     }
@@ -62,12 +64,12 @@
 
         switch ($Mode) {
             'Smb' { 
-                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value -TimeOut $Timeout  }
+                try { $ClientStream = New-SmbStream $RemoteIp $ParameterDictionary.PipeName.Value $Timeout }
                 catch { Write-Warning "Failed to open Smb stream. $($_.Exception.Message)" ; return }
                 continue 
             }
             'Tcp' { 
-                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value -TimeOut $Timeout }
+                try { $ClientStream = New-TcpStream $ServerIp $ParameterDictionary.Port.Value $ParameterDictionary.SslCn.Value $Timeout }
                 catch { Write-Warning "Failed to open Tcp stream. $($_.Exception.Message)" ; return }
                 continue 
             }
@@ -244,7 +246,7 @@
         }
     }
     End { # Cleanup
-        [console]::TreatControlCAsInput = $false
+        Write-Host "`n"
 
         if ($PSCmdlet.ParameterSetName -eq 'ReceiveFile') { $FileStream.Flush() ; $FileStream.Dispose() }
       
@@ -255,5 +257,6 @@
             try { Close-NetworkStream $RelayMode $RelayStream }
             catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
         }
+        [console]::TreatControlCAsInput = $false
     }
 }
