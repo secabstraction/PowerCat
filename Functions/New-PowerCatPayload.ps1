@@ -40,24 +40,27 @@
     DynamicParam {
         $ParameterDictionary = New-Object Management.Automation.RuntimeDefinedParameterDictionary
         
-        if ($Mode -eq 'Smb') { $PipeNameParam = New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
-        else { $PortParam = New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+        if ($Mode -eq 'Smb') { New-RuntimeParameter -Name PipeName -Type String -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
+        else { New-RuntimeParameter -Name Port -Type Int -Mandatory -Position 1 -ParameterDictionary $ParameterDictionary }
         
+        if ($Mode -eq 'Tcp') { New-RuntimeParameter -Name SslCn -Type String -ParameterDictionary $ParameterDictionary }
+
         if (!$Listener.IsPresent) {
             $Ipv4 = [regex]"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
-            $RemoteIpParam = New-RuntimeParameter -Name RemoteIp -Type String -Mandatory -Position 2 -ValidatePattern $Ipv4 -ParameterDictionary $ParameterDictionary
+            New-RuntimeParameter -Name RemoteIp -Type String -Mandatory -Position 2 -ValidatePattern $Ipv4 -ParameterDictionary $ParameterDictionary
         }
 
         if ($Execute.IsPresent) { 
-            $ScriptBlockParam = New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
-            $ArgumentListParam = New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
+            New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
+            New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
         }
-        if ($Execute.IsPresent -and $Listener.IsPresent) { $KeepAliveParam = New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary }
+        if ($Execute.IsPresent -and $Listener.IsPresent) { New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary }
         return $ParameterDictionary
     }
     Begin {
         $PayloadString = 'function New-RuntimeParameter {' + ${function:New-RuntimeParameter} + '}' 
         $PayloadString += 'function Test-Port {' + ${function:Test-Port} + '}' 
+        if ($ParameterDictionary.SslCn.Value) { $PayloadString += 'function New-X509Certificate {' + ${function:New-X509Certificate} + '}' } 
         switch ($Mode) { 
             'Smb' { $PayloadString += 'function New-SmbStream {' + ${function:New-SmbStream} + '}' }
             'Tcp' { $PayloadString += 'function New-TcpStream {' + ${function:New-TcpStream} + '}' }
@@ -88,6 +91,7 @@
         elseif ($Disconnect.IsPresent) { $PayloadString += ' -Disconnect' }
         if ($PSBoundParameters.Timeout) { $PayloadString += " -Timeout $Timeout" }
         if ($PSBoundParameters.Encoding) { $PayloadString += " -Encoding $Encoding" }
+        if ($ParameterDictionary.SslCn.Value) { $PayloadString += " -SslCn $($ParameterDictionary.SslCn.Value)" }
 
         $ScriptBlock = [ScriptBlock]::Create($PayloadString)
 
