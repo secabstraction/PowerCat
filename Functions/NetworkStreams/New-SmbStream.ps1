@@ -19,9 +19,14 @@
     )
 
     if ($Listener.IsPresent) {
-
-        $PipeServer = New-Object IO.Pipes.NamedPipeServerStream($PipeName, [IO.Pipes.PipeDirection]::InOut, 1, [IO.Pipes.PipeTransmissionMode]::Byte, [IO.Pipes.PipeOptions]::Asynchronous)
+        $PipeSecurity = New-Object IO.Pipes.PipeSecurity
+        $PipeServer = New-Object IO.Pipes.NamedPipeServerStream($PipeName, 3, 1, 0, [IO.Pipes.PipeOptions]::Asynchronous, $BufferSize, $BufferSize, $PipeSecurity, 0, [IO.Pipes.PipeAccessRights]::ChangePermissions)
+        $PipeSecurity = $PipeServer.GetAccessControl()
+        $PipeSecurity.AddAccessRule((New-Object IO.Pipes.PipeAccessRule("Everyone", [IO.Pipes.PipeAccessRights]::FullControl, 0)))
+        $PipeServer.SetAccessControl($PipeSecurity)
         $ConnectResult = $PipeServer.BeginWaitForConnection($null, $null)
+
+        Write-Verbose "Listening on 0.0.0.0:$PipeName [smb]"
        
         $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
         [console]::TreatControlCAsInput = $true

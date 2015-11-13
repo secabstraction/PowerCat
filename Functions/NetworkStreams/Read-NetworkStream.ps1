@@ -18,7 +18,7 @@
             $Stream.Read = $Stream.Pipe.BeginRead($Stream.Buffer, 0, $Stream.Buffer.Length, $null, $null)
             
             if ($BytesRead) { return $BytesReceived }
-            else { Write-Verbose '0 bytes read from Smb stream.' ; continue }
+            else { Write-Verbose 'Smb stream closed by remote end.' ; continue }
         }
         'Tcp' { 
             try { $BytesRead = $Stream.TcpStream.EndRead($Stream.Read) }
@@ -31,7 +31,7 @@
             $Stream.Read = $Stream.TcpStream.BeginRead($Stream.Buffer, 0, $Stream.Buffer.Length, $null, $null)
                 
             if ($BytesRead) { return $BytesReceived }
-            else { Write-Verbose '0 bytes read from Tcp stream.' ; continue }
+            else { Write-Verbose 'Tcp stream closed by remote end.' ; continue }
         }
         'Udp' { 
             try { $Bytes = $Stream.UdpClient.EndReceive($Stream.Read, [ref]$Stream.Socket.RemoteEndpoint) }
