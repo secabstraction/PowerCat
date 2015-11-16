@@ -8,7 +8,7 @@
         [String]$Protocol,
         
         [Parameter()]
-        [Int[]]$Port,
+        [Int[]]$Ports,
         
         [Parameter()]
         [String]$ApplicationName,
