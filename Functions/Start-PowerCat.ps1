@@ -1,4 +1,4 @@
-﻿function Start-PowerCat {
+function Start-PowerCat {
 <#
 Author: Jesse Davis (@secabstraction)
 License: BSD 3-Clause
@@ -33,6 +33,9 @@ License: BSD 3-Clause
         [Parameter()]
         [Alias('t')]
         [Int]$Timeout = 60,
+    
+        [Parameter()]
+        [Switch]$KeepAlive,
         
         [Parameter()]
         [ValidateSet('Ascii','Unicode','UTF7','UTF8','UTF32')]
@@ -49,7 +52,6 @@ License: BSD 3-Clause
         if ($Execute.IsPresent) { 
             New-RuntimeParameter -Name ScriptBlock -Type ScriptBlock -ParameterDictionary $ParameterDictionary 
             New-RuntimeParameter -Name ArgumentList -Type Object[] -ParameterDictionary $ParameterDictionary 
-            New-RuntimeParameter -Name KeepAlive -Type Switch -ParameterDictionary $ParameterDictionary
         }
         return $ParameterDictionary
     }
@@ -194,7 +196,7 @@ License: BSD 3-Clause
                     $Key = [console]::ReadKey()
                     if ($Key.Key -eq [Consolekey]::Escape) {
                         Write-Verbose 'Caught escape sequence, stopping PowerCat.'
-                        break
+                        return
                     }
                     if ($PSCmdlet.ParameterSetName -eq 'Console') { 
                         $BytesToSend = $EncodingType.GetBytes($Key.KeyChar + (Read-Host) + "`n") 
@@ -250,7 +252,7 @@ License: BSD 3-Clause
                 catch { Write-Warning "Failed to close relay stream. $($_.Exception.Message)" }
             }           
             [console]::TreatControlCAsInput = $false
-            if (!$ParameterDictionary.KeepAlive.IsSet) { break }
+            if (!$KeepAlive.IsPresent) { break }
         }
     }
     End {}
