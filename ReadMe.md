@@ -11,7 +11,7 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
 ```
 #### Functions & Parameters:
 ```powershell    
-Start-PowerCat  # Starts a listener/server.
+Start-PowerCat      # Starts a listener/server.
     
     -Mode           # Defaults to Tcp, can also specify Udp or Smb.
     -Port           # The port to listen on.
@@ -26,7 +26,7 @@ Start-PowerCat  # Starts a listener/server.
     -KeepAlive      # Restart after disconnecting.
     -Timeout        # Timeout option. Default: 60 seconds
 	
-Connect-PowerCat # Connects a client to a listener/server.
+Connect-PowerCat    # Connects a client to a listener/server.
 	
     -Mode           # Defaults to Tcp, can also specify Udp or Smb
     -RemoteIp       # IPv4 address of host to connect to.
