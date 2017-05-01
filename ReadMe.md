@@ -11,13 +11,13 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
 ```
 #### Functions & Parameters:
 ```powershell    
-    Start-PowerCat # Starts a listener/server.
+Start-PowerCat  # Starts a listener/server.
     
     -Mode           # Defaults to Tcp, can also specify Udp or Smb.
     -Port           # The port to listen on.
     -PipeName       # Name of pipe to listen on.
 	
-    -SslCn			# Common name for Ssl encrypting Tcp.
+    -SslCn	    # Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
@@ -26,14 +26,14 @@ PowerCat is packaged as a PowerShell module.  You must import the module to use 
     -KeepAlive      # Restart after disconnecting.
     -Timeout        # Timeout option. Default: 60 seconds
 	
-	Connect-PowerCat # Connects a client to a listener/server.
+Connect-PowerCat # Connects a client to a listener/server.
 	
     -Mode           # Defaults to Tcp, can also specify Udp or Smb
     -RemoteIp       # IPv4 address of host to connect to.
     -Port           # The port to connect to.
     -PipeName       # Name of pipe to connect to.
 	
-    -SslCn			# Common name for Ssl encrypting Tcp.
+    -SslCn	    # Common name for Ssl encrypting Tcp.
     -Relay          # Format: "<Mode>:<IP>:<Port/PipeName>"
     -Execute        # Execute a console process or powershell.
     -SendFile       # Filepath of file to send.
@@ -85,17 +85,17 @@ SSL
 -----------
 PowerCat generates X509 certificates on-the-fly to provide SSL encryption of TCP connections. 
 ```powershell
-	# Admin privileges are required to generate the self-signed certificate.
+    # Admin privileges are required to generate the self-signed certificate.
 	
     # Serve an SSL-Encrypted (Power)Shell:
     Start-PowerCat -Mode Tcp -Port 80 -SslCn <Certificate Common Name> -Execute
         
     # Connect to an SSL encrypted Ncat listener:
-	# Setup *nix with openssl & Ncat:
-	# openssl req -X509 -newkey rsa:2048 -subj /CN=PowerCat -days 90 -keyout key.pem -out cert.pem
-	# ncat -l -p 80 --ssl --ssl-cert cert.pem --ssl-key key.pem
+    # Setup *nix with openssl & Ncat:
+    # openssl req -X509 -newkey rsa:2048 -subj /CN=PowerCat -days 90 -keyout key.pem -out cert.pem
+    # ncat -l -p 80 --ssl --ssl-cert cert.pem --ssl-key key.pem
 	
-	Connect-PowerCat -Mode Tcp -RemoteIp 10.1.1.1 -Port 80 -SslCn PowerCat 
+    Connect-PowerCat -Mode Tcp -RemoteIp 10.1.1.1 -Port 80 -SslCn PowerCat 
 ```
 Relays
 ------
@@ -136,8 +136,8 @@ PowerCat can also perform port-scans, start persistent listeners, or act as a si
     # Persistent listener:
     Start-PowerCat -Port 443 -Execute -KeepAlive
 	
-	# Simple Web Server:
-	Start-PowerCat -Port 80 -SendFile index.html
+    # Simple Web Server:
+    Start-PowerCat -Port 80 -SendFile index.html
 ```
 Exiting
 ----------
